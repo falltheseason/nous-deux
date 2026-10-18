@@ -71,7 +71,7 @@ jobs:
             *) region="$loc" ;;
           esac
           echo "Base Firestore : $loc → fonction : $region"
-          echo "FUNCTION_REGION=$region" > functions/.env
+          echo "ND_REGION=$region" > functions/.env
 
       - name: Installer
         if: env.HAS_KEY == 'true'

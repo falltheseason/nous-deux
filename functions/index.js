@@ -1,4 +1,4 @@
-// Notifications de « Nous deux » (v1)
+// Notifications de « Nous deux »
 // Quand un message est créé, on prévient l'autre personne sur ses appareils.
 // Le contenu des messages est chiffré de bout en bout : la notification
 // dit seulement QUI a écrit, jamais ce qui a été écrit.
@@ -10,7 +10,7 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 // La région doit correspondre à celle de la base Firestore (fournie au déploiement).
-setGlobalOptions({ region: process.env.FUNCTION_REGION || "northamerica-northeast1", maxInstances: 2 });
+setGlobalOptions({ region: process.env.ND_REGION || "northamerica-northeast1", maxInstances: 2 });
 
 const PRESENT_MS = 75 * 1000; // l'autre a l'app ouverte → pas de notification
 const BAD_TOKEN = new Set([

@@ -9,6 +9,9 @@ on:
       - ".github/workflows/deploy-functions.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
   PROJECT_ID: nous-2-48a67
   PROJECT_NUMBER: "1009106158859"
@@ -80,5 +83,27 @@ jobs:
       - name: Déployer
         if: env.HAS_KEY == 'true'
         run: |
-          deploy() { npx -y firebase-tools@15 deploy --only functions --project "$PROJECT_ID" --force --non-interactive; }
-          deploy || { echo "Nouvel essai dans 90 s (première activation)…"; sleep 90; deploy; }
+          set -o pipefail
+          deploy() { npx -y firebase-tools@15 deploy --only functions --project "$PROJECT_ID" --force --non-interactive 2>&1 | tee -a "$RUNNER_TEMP/deploy.log"; }
+          deploy || { echo "Nouvel essai dans 90 s (première activation)…" | tee -a "$RUNNER_TEMP/deploy.log"; sleep 90; deploy; }
+
+      - name: Diagnostic des fonctions
+        if: always() && env.HAS_KEY == 'true'
+        run: |
+          {
+            echo "=== Fonctions installées ==="
+            gcloud functions list --project "$PROJECT_ID" --format="table(name,state,environment,location)" 2>&1 || true
+            echo "=== Base Firestore ==="
+            cat functions/.env 2>/dev/null || true
+          } | tee -a "$RUNNER_TEMP/deploy.log"
+
+      - name: Enregistrer le rapport (branche journal)
+        if: always() && env.HAS_KEY == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/j"
+          { echo "Exécution $GITHUB_RUN_ID — $(date -u) — résultat : ${{ job.status }}"; tail -n 300 "$RUNNER_TEMP/deploy.log" 2>/dev/null; } > "$RUNNER_TEMP/j/rapport.txt"
+          cd "$RUNNER_TEMP/j"
+          git init -q && git checkout -q -b journal
+          git config user.name "github-actions" && git config user.email "github-actions@users.noreply.github.com"
+          git add rapport.txt && git commit -q -m "Rapport $GITHUB_RUN_ID"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" journal

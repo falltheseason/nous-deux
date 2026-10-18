@@ -95,6 +95,19 @@ jobs:
             gcloud functions list --project "$PROJECT_ID" --format="table(name,state,environment,location)" 2>&1 || true
             echo "=== Base Firestore ==="
             cat functions/.env 2>/dev/null || true
+            R=$(sed -n 's/^ND_REGION=//p' functions/.env)
+            echo "=== Déclencheurs Eventarc ==="
+            gcloud eventarc triggers list --location="$R" --project "$PROJECT_ID" 2>&1 || true
+            echo "=== Base Firestore (détails) ==="
+            gcloud firestore databases describe --database='(default)' --project "$PROJECT_ID" --format="yaml(locationId,type,databaseEdition)" 2>&1 || true
+            echo "=== Rôles du compte de calcul ==="
+            gcloud projects get-iam-policy "$PROJECT_ID" --flatten="bindings[].members" --filter="bindings.members:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" --format="value(bindings.role)" 2>&1 || true
+            for f in testerNotification notifierMessage; do
+              echo "=== Journal $f ==="
+              gcloud functions logs read "$f" --region="$R" --project "$PROJECT_ID" --limit=40 2>&1 || true
+            done
+            echo "=== Journal Eventarc / Cloud Run (erreurs) ==="
+            gcloud logging read 'severity>=WARNING AND (resource.type="cloud_run_revision" OR resource.type="eventarc.googleapis.com/trigger" OR protoPayload.serviceName="eventarc.googleapis.com")' --project "$PROJECT_ID" --limit=30 --freshness=1d --format="value(timestamp,severity,textPayload,jsonPayload.message,protoPayload.status.message)" 2>&1 || true
           } | tee -a "$RUNNER_TEMP/deploy.log"
 
       - name: Enregistrer le rapport (branche journal)

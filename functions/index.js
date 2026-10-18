@@ -4,6 +4,7 @@
 
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
@@ -82,4 +83,25 @@ exports.testerNotification = onDocumentCreated("pings/{id}", async (event) => {
     result = { total: -1, sent: 0, errors: [String(e.code || e.message || e)] };
   }
   await event.data.ref.set({ done: true, ...result }, { merge: true });
+});
+
+// Relais d'appels (TURN Cloudflare) : identifiants temporaires, seulement pour vous deux
+exports.turnCredentials = onCall(async (req) => {
+  const uid = req.auth && req.auth.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Connexion requise");
+  const me = await db.collection("users").doc(uid).get();
+  if (!me.exists) throw new HttpsError("permission-denied", "Accès refusé");
+  const keyId = process.env.CF_TURN_KEY_ID, token = process.env.CF_TURN_TOKEN;
+  if (!keyId || !token) return { iceServers: [], configured: false };
+  const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${keyId}/credentials/generate-ice-servers`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ ttl: 86400 }),
+  });
+  if (!r.ok) throw new HttpsError("unavailable", `Cloudflare a répondu ${r.status}`);
+  const j = await r.json();
+  const list = Array.isArray(j.iceServers) ? j.iceServers : [j.iceServers];
+  // le port 53 ralentit les navigateurs : on l'enlève
+  const iceServers = list.filter(Boolean).map((s) => ({ ...s, urls: [].concat(s.urls).filter((u) => !/:53(\?|$)/.test(u)) }));
+  return { iceServers, configured: true };
 });

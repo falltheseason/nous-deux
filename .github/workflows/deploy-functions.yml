@@ -66,6 +66,9 @@ jobs:
 
       - name: Région de la base de données
         if: env.HAS_KEY == 'true'
+        env:
+          CF_ID: ${{ secrets.CF_TURN_KEY_ID }}
+          CF_TOKEN: ${{ secrets.CF_TURN_TOKEN }}
         run: |
           loc=$(gcloud firestore databases describe --database='(default)' --project "$PROJECT_ID" --format='value(locationId)')
           case "$loc" in
@@ -75,6 +78,12 @@ jobs:
           esac
           echo "Base Firestore : $loc → fonction : $region"
           echo "ND_REGION=$region" > functions/.env
+          if [ -n "$CF_ID" ] && [ -n "$CF_TOKEN" ]; then
+            printf 'CF_TURN_KEY_ID=%s\nCF_TURN_TOKEN=%s\n' "$CF_ID" "$CF_TOKEN" >> functions/.env
+            echo "Relais d'appels Cloudflare : configuré"
+          else
+            echo "Relais d'appels Cloudflare : pas encore configuré"
+          fi
 
       - name: Installer
         if: env.HAS_KEY == 'true'
@@ -94,7 +103,7 @@ jobs:
             echo "=== Fonctions installées ==="
             gcloud functions list --project "$PROJECT_ID" --format="table(name,state,environment,location)" 2>&1 || true
             echo "=== Base Firestore ==="
-            cat functions/.env 2>/dev/null || true
+            grep -v '^CF_TURN_TOKEN' functions/.env 2>/dev/null | sed 's/^CF_TURN_KEY_ID=.*/CF_TURN_KEY_ID=(présent)/' || true
             R=$(sed -n 's/^ND_REGION=//p' functions/.env)
             echo "=== Déclencheurs Eventarc ==="
             gcloud eventarc triggers list --location="$R" --project "$PROJECT_ID" 2>&1 || true
@@ -102,7 +111,7 @@ jobs:
             gcloud firestore databases describe --database='(default)' --project "$PROJECT_ID" --format="yaml(locationId,type,databaseEdition)" 2>&1 || true
             echo "=== Rôles du compte de calcul ==="
             gcloud projects get-iam-policy "$PROJECT_ID" --flatten="bindings[].members" --filter="bindings.members:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" --format="value(bindings.role)" 2>&1 || true
-            for f in testerNotification notifierMessage; do
+            for f in turnCredentials notifierAppel testerNotification; do
               echo "=== Journal $f ==="
               gcloud functions logs read "$f" --region="$R" --project "$PROJECT_ID" --limit=40 2>&1 || true
             done

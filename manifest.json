@@ -1,7 +1,7 @@
 {
   "name": "Nous deux",
   "short_name": "Nous deux",
-  "description": "Jasette, listes et photos, rien que pour nous deux.",
+  "description": "Discussion, listes et photos, rien que pour nous deux.",
   "lang": "fr-CA",
   "start_url": "./",
   "scope": "./",

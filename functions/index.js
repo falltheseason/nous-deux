@@ -1,4 +1,4 @@
-// Notifications de « Nous deux »
+// Notifications de « Nous deux » (v1)
 // Quand un message est créé, on prévient l'autre personne sur ses appareils.
 // Le contenu des messages est chiffré de bout en bout : la notification
 // dit seulement QUI a écrit, jamais ce qui a été écrit.

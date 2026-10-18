@@ -903,10 +903,73 @@ function choosePin(then) {
   });
 }
 
+/* ---------- Empreinte digitale (WebAuthn + extension PRF) ----------
+   Le capteur du téléphone produit un secret, disponible seulement après
+   ton empreinte. Ce secret chiffre la clé sur l'appareil : sans ton doigt
+   (ou ton NIP), la clé reste illisible. */
+const bioSupported = () => !!(window.PublicKeyCredential && navigator.credentials?.create);
+const bioRecord = () => { const b = lsGet("bio"); return b && S.meta && b.tag === vaultTag(S.meta) ? b : null; };
+async function bioWrapKey(prf) {
+  const base = await crypto.subtle.importKey("raw", prf, "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: te.encode("nous-deux-empreinte"), info: te.encode("cle-locale") },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function bioSecret(credId, salt) {
+  const cred = await navigator.credentials.get({ publicKey: {
+    challenge: rand(32), rpId: location.hostname, timeout: 60000, userVerification: "required",
+    allowCredentials: [{ type: "public-key", id: credId }],
+    extensions: { prf: { eval: { first: salt } } },
+  } });
+  const out = cred?.getClientExtensionResults?.()?.prf?.results?.first;
+  if (!out) throw Object.assign(new Error("Ce téléphone ne permet pas encore le déverrouillage par empreinte pour les apps web."), { code: "noprf" });
+  return new Uint8Array(out);
+}
+async function bioEnable(raw) {
+  const salt = rand(32);
+  const cred = await navigator.credentials.create({ publicKey: {
+    rp: { name: "Nous deux", id: location.hostname },
+    user: { id: rand(16), name: S.me.email || "nous-deux", displayName: `${S.me.name} · Nous deux` },
+    challenge: rand(32), timeout: 60000,
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+    authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+    extensions: { prf: { eval: { first: salt } } },
+  } });
+  const id = new Uint8Array(cred.rawId);
+  const ext = cred.getClientExtensionResults?.()?.prf;
+  if (ext && ext.enabled === false) throw Object.assign(new Error("Ce téléphone ne permet pas encore le déverrouillage par empreinte pour les apps web."), { code: "noprf" });
+  let secret = ext?.results?.first ? new Uint8Array(ext.results.first) : null;
+  if (!secret) { toast("Touche encore le capteur pour confirmer 👆", 0); secret = await bioSecret(id, salt); }
+  const k = await bioWrapKey(secret);
+  lsSet("bio", { v: 1, id: b64(id), salt: b64(salt), ct: b64(await seal(k, raw)), tag: vaultTag(S.meta) });
+}
+async function bioUnlock() {
+  const b = bioRecord();
+  const secret = await bioSecret(unb64(b.id), unb64(b.salt));
+  try { return await unseal(await bioWrapKey(secret), unb64(b.ct)); }
+  catch { lsDel("bio"); throw Object.assign(new Error("L'empreinte enregistrée ne correspond plus. Entre ton NIP, puis réactive l'empreinte."), { code: "stale" }); }
+}
+function forgetDevice() { ["key", "fails", "bio"].forEach(lsDel); }
+
 function vaultPin(msg) {
   const r = lsGet("key");
+  const bio = bioSupported() && bioRecord();
+  let busyBio = false;
+  const tryBio = async () => {
+    if (busyBio) return;
+    busyBio = true;
+    try {
+      const raw = await bioUnlock();
+      KEY = await aesKey(raw);
+      lsSet("fails", 0);
+      hideToast();
+      startApp();
+    } catch (e) {
+      if (e.code === "stale" || e.code === "noprf") toast(e.message, 6000);
+      else if (e.name !== "NotAllowedError" && e.name !== "AbortError") toast("Empreinte non reconnue. Utilise ton NIP.", 4000);
+    } finally { busyBio = false; }
+  };
   keypad({
-    title: "Entre ton NIP", len: r.len, sub: msg,
+    title: bio ? "Nous deux" : "Entre ton NIP", len: r.len, sub: msg || (bio ? "Touche le capteur, ou entre ton NIP." : null),
     onDone: async (pin) => {
       try {
         const raw = await unlockLocalKey(pin);
@@ -917,7 +980,7 @@ function vaultPin(msg) {
         const fails = (+lsGet("fails") || 0) + 1;
         lsSet("fails", fails);
         if (fails >= MAX_PIN_FAILS) {
-          lsDel("key"); lsDel("fails");
+          forgetDevice();
           vaultJoin("Trop d'essais : la phrase a été oubliée sur cet appareil. Entre-la de nouveau.");
           return;
         }
@@ -925,10 +988,37 @@ function vaultPin(msg) {
         return { error: `Mauvais NIP. ${left} essai${left > 1 ? "s" : ""} restant${left > 1 ? "s" : ""}.` };
       }
     },
-    extra: h("div", { class: "rowbtns", style: "margin-top:10px" },
+    extra: h("div", { class: "rowbtns", style: "margin-top:10px;flex-direction:column;align-items:center;gap:12px" },
+      bio ? h("button", { class: "btn ghost", onclick: tryBio }, h("span", { text: "👆" }), "Utiliser l'empreinte") : null,
       h("button", { class: "link2", text: "NIP oublié?", onclick: () => {
-        if (confirm("Oublier la phrase sur cet appareil? Tu devras la retaper pour choisir un nouveau NIP.")) { lsDel("key"); lsDel("fails"); vaultJoin(); }
+        if (confirm("Oublier la phrase sur cet appareil? Tu devras la retaper pour choisir un nouveau NIP.")) { forgetDevice(); vaultJoin(); }
       } })),
+  });
+  if (bio && !msg) setTimeout(tryBio, 350);
+}
+
+/* Activer / désactiver l'empreinte (depuis les Réglages) */
+function bioSetup() {
+  if (!bioSupported()) { toast("Ce navigateur ne permet pas l'empreinte digitale."); return; }
+  const r = lsGet("key");
+  if (!r) { toast("Déverrouille d'abord avec ta phrase secrète."); return; }
+  keypad({
+    title: "Confirme ton NIP", len: r.len, sub: "Pour activer le déverrouillage par empreinte sur cet appareil.",
+    onDone: async (pin) => {
+      let raw;
+      try { raw = await unlockLocalKey(pin); }
+      catch { return { error: "Mauvais NIP." }; }
+      showScreen("app");
+      try {
+        await bioEnable(raw);
+        toast("Empreinte activée 👆 La prochaine fois, touche simplement le capteur.", 5000);
+      } catch (e) {
+        console.error(e);
+        if (e.name === "NotAllowedError" || e.name === "AbortError") toast("Activation annulée.");
+        else toast(e.code === "noprf" ? e.message : "Impossible d'activer l'empreinte : " + (e.message || e), 7000);
+      }
+    },
+    extra: h("div", { class: "rowbtns", style: "margin-top:10px" }, h("button", { class: "link2", text: "Annuler", onclick: () => showScreen("app") })),
   });
 }
 
@@ -1041,7 +1131,7 @@ async function signOut() {
   if (S.me) {
     const t = lsGet("fcm");
     if (t) { await be.set("users", S.me.uid, { fcm: be.arrayRemove(t) }, true).catch(() => {}); be.deleteMessagingToken?.().catch(() => {}); }
-    ["key", "fails", "fcm"].forEach(lsDel);
+    ["key", "fails", "fcm", "bio"].forEach(lsDel);
   }
   lockState();
   be?.signOut();
@@ -1425,6 +1515,9 @@ function openSettings() {
     menuRow("🔔", on ? "Désactiver les notifications" : "Activer les notifications",
       on ? "Activées sur cet appareil" : "Être averti quand " + partnerName() + " t'écrit",
       async () => { closeSheet(); on ? await disableNotifs() : await enableNotifs(); }),
+    bioSupported() ? menuRow("👆", bioRecord() ? "Désactiver l'empreinte" : "Déverrouiller avec l'empreinte",
+      bioRecord() ? "Activée sur cet appareil" : "Au lieu du NIP, sur cet appareil",
+      () => { if (bioRecord()) { lsDel("bio"); closeSheet(); toast("Empreinte désactivée"); } else { closeSheetNow(); bioSetup(); } }) : null,
     menuRow("🧪", "Tester les notifications", "Envoie une notification de test sur tes appareils", () => { closeSheet(); testNotifs(); }),
     menuRow("🔒", "Verrouiller maintenant", "Il faudra entrer ton NIP", () => { closeSheetNow(); lock(); }),
     menuRow("👋", "Se déconnecter", S.me.email ? S.me.email + " · la phrase secrète sera oubliée sur cet appareil" : "",

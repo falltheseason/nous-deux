@@ -1,6 +1,6 @@
 // Service worker : permet l'installation et l'ouverture rapide, même hors ligne.
 // Toujours « réseau d'abord » pour que les mises à jour arrivent tout de suite.
-const CACHE = "nous-deux-v1";
+const CACHE = "nous-deux-v2";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {

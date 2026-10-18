@@ -136,6 +136,36 @@ body.typing nav.tabs{display:none}
 .viewer .cap.empty-cap{color:rgba(255,255,255,.55);font-weight:500}
 .viewer .vmeta{font-size:13px;color:rgba(255,255,255,.6);font-weight:700}
 
+/* Coffre / NIP */
+#s-vault{gap:14px}
+#s-vault .logo{width:72px;height:72px;border-radius:22px}
+#s-vault h1{font-size:25px}
+.vbox{width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;text-align:left}
+.vbox p{max-width:none}
+.phrase{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:16px;padding:14px;font:inherit;font-weight:800;font-size:18px;line-height:1.4;resize:none;outline:none;text-align:center}
+.phrase:focus{border-color:var(--accent)}
+.rowbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.chk{display:flex;gap:10px;align-items:flex-start;color:var(--text);font-size:15px;line-height:1.35;cursor:pointer}
+.chk input{width:20px;height:20px;accent-color:var(--accent);flex:none;margin-top:1px}
+.warn{background:var(--surface2);border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.4;color:var(--text)}
+.err{color:var(--accent);font-weight:800;min-height:1.4em;text-align:center}
+.dots{display:flex;gap:14px;justify-content:center;margin:6px 0 4px}
+.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
+.dots i.on{background:var(--accent);border-color:var(--accent)}
+.dots.shake{animation:shake .35s}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.keypad{display:grid;grid-template-columns:repeat(3,76px);gap:14px 22px;justify-content:center;margin-top:8px}
+.keypad button{width:76px;height:76px;border-radius:50%;border:0;background:var(--surface);box-shadow:var(--shadow);font-size:28px;font-weight:700;display:grid;place-items:center}
+.keypad button:active{background:var(--surface2)}
+.keypad button.k-blank{background:none;box-shadow:none;pointer-events:none}
+.keypad button.k-fn{background:none;box-shadow:none;font-size:15px;font-weight:800;color:var(--muted)}
+.keypad button.k-ok{background:var(--accent);color:var(--accent-ink);font-size:17px;font-weight:800}
+.keypad button:disabled{opacity:.35}
+.link2{border:0;background:none;color:var(--muted);font-weight:800;font-size:14px;text-decoration:underline;text-underline-offset:3px}
+.spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--surface2);border-top-color:var(--accent);animation:spin .8s linear infinite;margin:10px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.b.photo .ph{width:220px;max-width:62vw;aspect-ratio:1;border-radius:17px;display:grid;place-items:center;color:var(--muted);font-size:13px;font-weight:700}
+
 /* Toast */
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 84px);transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:999px;font-weight:700;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:30;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -177,10 +207,14 @@ body.typing nav.tabs{display:none}
   <button class="btn ghost" data-signout>Changer de compte</button>
 </section>
 
+<!-- Phrase secrète / NIP -->
+<section class="screen hidden" id="s-vault"></section>
+
 <!-- App -->
 <div id="app" class="hidden">
   <header class="top">
     <div class="brand"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.9 4.5 6.6 4.5c2.2 0 3.6 1.2 4.4 2.5.8-1.3 2.2-2.5 4.4-2.5 3.7 0 5.7 3.9 4.2 7.3C19.5 16.4 12 21 12 21z"/></svg><span class="appname">Nous deux</span></div>
+    <button class="plain" id="btn-lock" aria-label="Verrouiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></button>
     <button class="pair" id="btn-me" style="border:0;background:none" aria-label="Compte"></button>
   </header>
 
@@ -281,8 +315,7 @@ body.typing nav.tabs{display:none}
 
 <script type="module">
 /* ============================================================
-   CONFIGURATION — colle ici la config de ton projet Firebase
-   (Console Firebase → ⚙️ Paramètres du projet → Tes applications → Config)
+   CONFIGURATION — config du projet Firebase
    ============================================================ */
 const APP_NAME = "Nous deux";
 const firebaseConfig = {
@@ -298,6 +331,8 @@ const firebaseConfig = {
 const FB = "https://www.gstatic.com/firebasejs/12.19.0/";
 const DEMO = new URLSearchParams(location.search).has("demo");
 const CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "COLLE_ICI";
+const AUTO_LOCK_MS = 3 * 60e3;   // verrouillage après 3 min en arrière-plan
+const MAX_PIN_FAILS = 5;
 
 /* ---------- Outils ---------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -329,6 +364,8 @@ const ICON = {
   check: () => svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 'fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"'),
   x: () => svg('<path d="M7 7l10 10M17 7L7 17"/>'),
   chev: () => svg('<path d="M9 5l7 7-7 7"/>'),
+  lock: () => svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 'width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"'),
+  back: () => svg('<path d="M14 7l-5 5 5 5M20 12H9"/>', 'width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"'),
 };
 
 let toastTimer;
@@ -372,6 +409,80 @@ function linkify(el, text) {
   if (last < text.length) el.append(text.slice(last));
 }
 
+/* ============================================================
+   CHIFFREMENT DE BOUT EN BOUT
+   - La phrase secrète → clé AES-256 (PBKDF2-SHA256, 600 000 tours).
+   - Tout le contenu est chiffré (AES-GCM) sur l'appareil avant l'envoi.
+   - Sur chaque appareil, la clé est gardée chiffrée par le NIP.
+   ============================================================ */
+const te = new TextEncoder(), td = new TextDecoder();
+const PHRASE_ITER = 600000, PIN_ITER = 250000;
+const CHECK_TEXT = "nous-deux-ok";
+const rand = (n) => crypto.getRandomValues(new Uint8Array(n));
+function b64(u8) { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+function normPhrase(p) {
+  return p.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .split(/[^a-z0-9]+/).filter(Boolean).join("-");
+}
+async function pbkdf2(secret, salt, iterations) {
+  const base = await crypto.subtle.importKey("raw", te.encode(secret), "PBKDF2", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, base, 256));
+}
+const aesKey = (raw) => crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+async function seal(key, bytes) {
+  const iv = rand(12);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes));
+  const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12);
+  return out;
+}
+async function unseal(key, data) {
+  return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: data.subarray(0, 12) }, key, data.subarray(12)));
+}
+
+let KEY = null; // clé en mémoire seulement pendant que l'app est déverrouillée
+const encJ = async (obj) => be.bytes(await seal(KEY, te.encode(JSON.stringify(obj))));
+const decJ = async (u8) => JSON.parse(td.decode(await unseal(KEY, u8)));
+const encBlob = async (blob) => be.bytes(await seal(KEY, new Uint8Array(await blob.arrayBuffer())));
+const decBlob = async (u8) => new Blob([await unseal(KEY, u8)], { type: "image/jpeg" });
+
+/* Phrase suggérée : 6 mots au hasard */
+const WORDS = [...new Set(`abeille abricot acier aigle aile algue amande ananas ancre ange anneau arbre ardoise argent atlas aube autruche avion avoine baie baleine balle bambou banane banc barque bateau baton bec beret beurre biche bijou bille biscuit bison blason bleuet bocal bois boite bol bonbon bougie bouleau boussole branche brebis brique brise brume bulle buisson cabane cactus cadeau cadre caillou camion canard canne canot cape carafe carotte carte castor cerise cerf chalet chameau champ chanson chapeau charbon chat chateau chemin chene cheval chien chocolat cidre cigale cirque citron clairon cloche clou cobra cocon coffre colibri colline comete compas concombre coq corail corde cornet coton coude coussin crabe craie crayon creme criquet crocus cube cuivre cygne dahlia dalle dauphin delta desert diamant domino dragon drapeau dune eclair ecorce ecureuil elan encre epice epine erable escargot etoile etang faisan falaise farine faucon fenetre feuille fifre figue flamant fleur flocon flute foin fontaine foret fougere four fraise framboise frene fromage fruit fusee galet gant gateau gazelle geant genet girafe glace gland globe gomme gorille goutte grain grange grenade grenouille griffon grotte guitare hamac hamster harpe herbe hibou hiver homard horloge houblon huitre iris jade jardin jasmin jonc jongleur jupe kayak kiwi koala lagune laine lampe lapin laurier lavande legume lezard lievre lilas lime lion loup loutre lune lutin lynx macaron magnolia manche mangue manteau marbre marmotte marron masque matelas melon menthe meringue merle miel miroir mouette mouton muguet nacre navet nectar neige noisette noix nuage oasis ocean oeillet olive ombre opale orage orange orchidee ortie ours outil pain palmier panda papillon parfum patate paon pelle perle perroquet phare piano pierre pigeon pinceau pirate pizza plage plume poire poisson pomme pont potiron poule prairie prune puits puzzle quartz racine radis raisin rameau raquette radeau renard requin rivage riviere robot rocher roseau rubis ruche ruisseau sable sabot sapin sardine satin saule saumon savon serpent sirop soleil souris sucre tambour tapis taupe theiere tigre tilleul tipi tomate tonneau tortue toupie tournesol train trefle trompette tuile tulipe valise vallee vanille velo verger violon volcan wagon yaourt zebre zeste`.split(/\s+/))];
+function suggestPhrase(n = 6) {
+  const out = [];
+  const lim = Math.floor(65536 / WORDS.length) * WORDS.length;
+  while (out.length < n) {
+    const [v] = crypto.getRandomValues(new Uint16Array(1));
+    if (v < lim) out.push(WORDS[v % WORDS.length]);
+  }
+  return out.join("-");
+}
+
+/* Clé gardée sur l'appareil, chiffrée par le NIP */
+const lsName = (k) => `nd:${DEMO ? "demo" : firebaseConfig.projectId}:${S.me?.uid}:${k}`;
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(lsName(k))); } catch { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(lsName(k), JSON.stringify(v)); } catch {} }
+function lsDel(k) { try { localStorage.removeItem(lsName(k)); } catch {} }
+const vaultTag = (meta) => b64(meta.salt).slice(0, 12);
+async function storeLocalKey(raw, pin) {
+  const salt = rand(16);
+  const k = await aesKey(await pbkdf2(pin, salt, PIN_ITER));
+  lsSet("key", { v: 1, salt: b64(salt), ct: b64(await seal(k, raw)), len: pin.length, tag: vaultTag(S.meta) });
+  lsSet("fails", 0);
+}
+async function unlockLocalKey(pin) {
+  const r = lsGet("key");
+  const k = await aesKey(await pbkdf2(pin, unb64(r.salt), PIN_ITER));
+  return unseal(k, unb64(r.ct)); // lance une erreur si le NIP est mauvais
+}
+async function keyFromPhrase(phrase, meta) {
+  const raw = await pbkdf2(normPhrase(phrase), meta.salt, meta.iter || PHRASE_ITER);
+  const key = await aesKey(raw);
+  try { if (td.decode(await unseal(key, meta.check)) !== CHECK_TEXT) return null; }
+  catch { return null; }
+  return { raw, key };
+}
+
 /* ---------- Compression des photos ---------- */
 async function loadImage(file) {
   try { return await createImageBitmap(file, { imageOrientation: "from-image" }); }
@@ -390,18 +501,18 @@ function toJpeg(src, max, q) {
   const c = document.createElement("canvas");
   c.width = w; c.height = hh;
   c.getContext("2d").drawImage(src, 0, 0, w, hh);
-  return { url: c.toDataURL("image/jpeg", q), w, h: hh };
+  return new Promise((res) => c.toBlob((blob) => res({ blob, w, h: hh }), "image/jpeg", q));
 }
 async function compress(file) {
   const img = await loadImage(file);
   let max = 1600, q = 0.82, full;
-  for (let i = 0; i < 7; i++) {
-    full = toJpeg(img, max, q);
-    if (full.url.length < 880000) break;   // une fiche Firestore = 1 Mo max
+  for (let i = 0; i < 8; i++) {
+    full = await toJpeg(img, max, q);
+    if (full.blob.size < 880000) break;   // une fiche Firestore = 1 Mo max
     q = Math.max(0.45, q - 0.08);
     max = Math.round(max * 0.87);
   }
-  const thumb = toJpeg(img, 440, 0.72);
+  const thumb = await toJpeg(img, 440, 0.72);
   img.close?.();
   return { full, thumb };
 }
@@ -425,7 +536,11 @@ async function firebaseBackend() {
 
   const conv = (d) => {
     const out = { id: d.id, ...d.data({ serverTimestamps: "estimate" }) };
-    for (const k in out) if (out[k] && typeof out[k].toDate === "function") out[k] = out[k].toDate();
+    for (const k in out) {
+      const v = out[k];
+      if (v instanceof F.Bytes) out[k] = v.toUint8Array();
+      else if (v && typeof v.toDate === "function") out[k] = v.toDate();
+    }
     return out;
   };
   try { await A.getRedirectResult(auth); } catch (e) { console.warn(e); }
@@ -453,7 +568,23 @@ async function firebaseBackend() {
     set: (col, id, data, merge) => F.setDoc(F.doc(db, col, id), data, merge ? { merge: true } : {}),
     update: (col, id, data) => F.updateDoc(F.doc(db, col, id), data),
     remove: (col, id) => F.deleteDoc(F.doc(db, col, id)),
-    async get(col, id) { const s = await F.getDoc(F.doc(db, col, id)); return s.exists() ? conv(s) : null; },
+    async get(col, id, server) {
+      const ref = F.doc(db, col, id);
+      let s;
+      if (server) { try { s = await F.getDocFromServer(ref); } catch (e) { if (e.code === "permission-denied") throw e; s = await F.getDoc(ref); } }
+      else s = await F.getDoc(ref);
+      return s.exists() ? conv(s) : null;
+    },
+    async listIds(col) { return (await F.getDocs(F.collection(db, col))).docs.map((d) => d.id); },
+    createIfAbsent(col, id, data) {
+      const ref = F.doc(db, col, id);
+      return F.runTransaction(db, async (tx) => {
+        const s = await tx.get(ref);
+        if (s.exists()) return false;
+        tx.set(ref, data);
+        return true;
+      });
+    },
     async removeMany(pairs) {
       for (let i = 0; i < pairs.length; i += 400) {
         const b = F.writeBatch(db);
@@ -461,6 +592,7 @@ async function firebaseBackend() {
         await b.commit();
       }
     },
+    bytes: (u8) => F.Bytes.fromUint8Array(u8),
     ts: () => F.serverTimestamp(),
   };
 }
@@ -482,9 +614,11 @@ function demoBackend() {
   };
   const emit = (c) => subs.filter((s) => s.col === c).forEach(run);
   const fix = (d) => { const o = { ...d }; for (const k in o) if (o[k] === "__TS__") o[k] = new Date(); return o; };
-  const be = {
+  window.__demoStore = store; // pour les tests
+  col("users").set("elle", { name: "Ton amour", photo: "", lastSeen: new Date() });
+  return {
     demo: true,
-    signIn() {}, signOut() { location.href = location.pathname; },
+    signIn() {}, signOut() { location.href = location.pathname + "?demo"; },
     onUser(cb) { setTimeout(() => cb({ uid: "moi", displayName: "Toi", photoURL: "" })); return () => {}; },
     watch(c, opt, cb) { const s = { col: c, opt, cb }; subs.push(s); run(s); return () => subs.splice(subs.indexOf(s), 1); },
     newId: () => nid(),
@@ -492,51 +626,24 @@ function demoBackend() {
     async update(c, id, data) { const m = col(c); m.set(id, { ...m.get(id), ...fix(data) }); emit(c); },
     async remove(c, id) { col(c).delete(id); emit(c); },
     async get(c, id) { const d = col(c).get(id); return d ? { id, ...d } : null; },
+    async listIds(c) { return [...col(c).keys()]; },
+    async createIfAbsent(c, id, data) { if (col(c).has(id)) return false; col(c).set(id, fix(data)); return true; },
     async removeMany(p) { p.forEach(([c, id]) => col(c).delete(id)); [...new Set(p.map((x) => x[0]))].forEach(emit); },
+    bytes: (u8) => u8,
     ts: () => "__TS__",
   };
-  // Données d'exemple
-  const ago = (min) => new Date(Date.now() - min * 60e3);
-  col("users").set("moi", { name: "Toi", photo: "" });
-  col("users").set("elle", { name: "Ton amour", photo: "", lastSeen: new Date() });
-  const msgs = [
-    ["elle", "Bon matin toi ☀️", 60 * 26], ["moi", "Bon matin! Bien dormi?", 60 * 26 - 2],
-    ["elle", "Oui! On se fait un souper ce soir?", 125], ["moi", "Parfait, je m'occupe de l'épicerie", 122],
-    ["moi", "J'ai ajouté ce qu'il manque dans la liste", 121], ["elle", "❤️", 120],
-    ["elle", "As-tu vu la photo du chalet? Trop beau", 14], ["moi", "Oui!! On y retourne cet hiver?", 3],
-  ];
-  msgs.forEach(([by, text, m]) => col("messages").set(nid(), { by, text, createdAt: ago(m) }));
-  const L1 = nid(), L2 = nid();
-  col("lists").set(L1, { title: "Épicerie", by: "moi", createdAt: ago(3000) });
-  col("lists").set(L2, { title: "Films à voir", by: "elle", createdAt: ago(2000) });
-  [["Lait", 0], ["Avocats", 0], ["Pain au levain", 0], ["Café", 1], ["Pâtes", 1]].forEach(([t, d], i) =>
-    col("items").set(nid(), { listId: L1, text: t, done: !!d, by: i % 2 ? "elle" : "moi", createdAt: ago(200 - i) }));
-  [["Past Lives", 0], ["Dune : deuxième partie", 1], ["Le Déclin de l'empire américain", 0]].forEach(([t, d], i) =>
-    col("items").set(nid(), { listId: L2, text: t, done: !!d, by: "elle", createdAt: ago(100 - i) }));
-  const swatch = (a, b, emo) => {
-    const c = document.createElement("canvas"); c.width = c.height = 440;
-    const x = c.getContext("2d"); const g = x.createLinearGradient(0, 0, 440, 440);
-    g.addColorStop(0, a); g.addColorStop(1, b); x.fillStyle = g; x.fillRect(0, 0, 440, 440);
-    x.font = "150px serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(emo, 220, 230);
-    return c.toDataURL("image/jpeg", 0.8);
-  };
-  [["#F6B48F", "#D9536A", "🏔️", "Le chalet", 15], ["#8EC5E8", "#3B6FB6", "🌊", "", 900], ["#F7D774", "#E58B3A", "🍝", "Souper chez nous", 3000],
-   ["#B9E4C9", "#3F9A78", "🌲", "", 5000], ["#E4C1F9", "#9B5DE5", "🎂", "Ta fête!", 9000]].forEach(([a, b, e, cap, m], i) => {
-    const id = nid(), u = swatch(a, b, e);
-    col("photos").set(id, { thumb: u, caption: cap, by: i % 2 ? "moi" : "elle", w: 440, h: 440, createdAt: ago(m) });
-    col("photosFull").set(id, { data: u });
-  });
-  return be;
 }
 
 /* ============================================================
    État et écrans
    ============================================================ */
-const S = { me: null, users: {}, messages: [], lists: [], items: [], photos: [], view: "chat", openList: null, openListAt: 0, viewer: null };
+const S = { me: null, meta: null, users: {}, messages: [], lists: [], items: [], photos: [], photosById: new Map(), photosLoaded: false,
+  view: "chat", openList: null, openListAt: 0, viewer: null };
 let be, unsubs = [];
+const CONTENT = ["messages", "lists", "items", "photos", "photosFull"];
 
 function showScreen(name) {
-  ["loading", "setup", "login", "denied"].forEach((s) => $("#s-" + s).classList.toggle("hidden", s !== name));
+  ["loading", "setup", "login", "denied", "vault"].forEach((s) => $("#s-" + s).classList.toggle("hidden", s !== name));
   $("#app").classList.toggle("hidden", name !== "app");
 }
 $$(".appname").forEach((e) => (e.textContent = APP_NAME));
@@ -545,7 +652,7 @@ document.title = APP_NAME;
 function onErr(e) {
   console.error(e);
   if (e && (e.code === "permission-denied" || e.code === "firestore/permission-denied")) {
-    unsubs.forEach((u) => u()); unsubs = [];
+    stopWatchers();
     $("#denied-msg").textContent = `Le compte ${S.me?.email || ""} n'a pas accès à cette app.`;
     showScreen("denied");
   } else {
@@ -555,6 +662,7 @@ function onErr(e) {
 
 async function start() {
   if (!CONFIGURED && !DEMO) { showScreen("setup"); return; }
+  if (!window.crypto?.subtle) { showScreen("setup"); $("#s-setup p").textContent = "Ce navigateur ne permet pas le chiffrement. Ouvre l'app en https dans Chrome."; return; }
   if (DEMO) document.body.append(h("div", { class: "demo-flag", text: "DÉMO" }));
   try { be = DEMO ? demoBackend() : await firebaseBackend(); }
   catch (e) { console.error(e); showScreen("login"); const p = $("#login-err"); p.textContent = "Impossible de charger Firebase. Vérifie ta connexion."; p.classList.remove("hidden"); return; }
@@ -562,23 +670,266 @@ async function start() {
 }
 
 function leave() {
-  unsubs.forEach((u) => u()); unsubs = [];
+  lockState();
   S.me = null;
   showScreen("login");
 }
 
-function enter(u) {
+async function enter(u) {
   S.me = { uid: u.uid, name: (u.displayName || "Moi").split(" ")[0], photo: u.photoURL || "", email: u.email || "" };
+  showScreen("loading");
+  be.set("users", u.uid, { name: S.me.name, photo: S.me.photo }, true).catch(() => {});
+  try { S.meta = await be.get("meta", "crypto", true); }
+  catch (e) { onErr(e); return; }
+  routeVault();
+}
+
+function routeVault(msg) {
+  if (!S.meta) return vaultCreate();
+  const r = lsGet("key");
+  if (r && r.tag !== vaultTag(S.meta)) lsDel("key"); // la phrase a changé
+  if (lsGet("key")) return vaultPin(msg);
+  return vaultJoin(msg);
+}
+
+/* ---------- Écrans de la phrase secrète et du NIP ---------- */
+function vaultScreen(...kids) {
+  const el = $("#s-vault");
+  el.replaceChildren(h("div", { class: "logo" }, ICON.lock()), ...kids.filter(Boolean));
+  showScreen("vault");
+  return el;
+}
+const busy = (text) => vaultScreen(h("h1", { text }), h("div", { class: "spin" }), h("p", { text: "Quelques secondes…" }));
+
+function vaultCreate() {
+  let phrase = suggestPhrase();
+  const ta = h("textarea", { class: "phrase", rows: 2, spellcheck: "false", autocapitalize: "off", autocomplete: "off" });
+  ta.value = phrase;
+  const ok = h("input", { type: "checkbox" });
+  const err = h("div", { class: "err" });
+  const go = h("button", { class: "btn", disabled: true, text: "Continuer" });
+  ok.onchange = () => (go.disabled = !ok.checked);
+  go.onclick = () => {
+    const p = normPhrase(ta.value);
+    if (p.split("-").length < 4 || p.length < 16) { err.textContent = "Utilise au moins 4 mots."; return; }
+    choosePin((pin) => createVault(p, pin));
+  };
+  vaultScreen(
+    h("h1", { text: "Votre phrase secrète" }),
+    h("div", { class: "vbox" },
+      h("p", { text: "Elle chiffre tout votre contenu. Vous la taperez une seule fois sur chaque appareil (Annie et toi devez avoir la même)." }),
+      ta,
+      h("div", { class: "rowbtns" },
+        h("button", { class: "btn ghost small", text: "Autre suggestion", onclick: () => { ta.value = suggestPhrase(); } }),
+        h("button", { class: "btn ghost small", text: "Copier", onclick: async () => {
+          try { await navigator.clipboard.writeText(ta.value.trim()); toast("Phrase copiée"); } catch { ta.select(); toast("Sélectionne et copie la phrase"); }
+        } })),
+      h("div", { class: "warn", text: "⚠️ Si vous perdez cette phrase tous les deux, votre contenu sera perdu pour de bon. Personne ne pourra le récupérer." }),
+      h("label", { class: "chk" }, ok, h("span", { text: "Je l'ai enregistrée dans mon gestionnaire de mots de passe." })),
+      h("p", { style: "font-size:13px", text: "Les anciens messages, listes et photos (non chiffrés) seront effacés." }),
+      err,
+      h("div", { class: "rowbtns" }, go)));
+}
+
+function vaultJoin(msg) {
+  const ta = h("textarea", { class: "phrase", rows: 2, spellcheck: "false", autocapitalize: "off", autocomplete: "off", placeholder: "mot-mot-mot-mot…" });
+  const err = h("div", { class: "err", text: msg || "" });
+  const go = h("button", { class: "btn", text: "Déverrouiller" });
+  go.onclick = async () => {
+    if (!ta.value.trim()) return;
+    const typed = ta.value;
+    busy("Vérification…");
+    const res = await keyFromPhrase(typed, S.meta);
+    if (!res) { vaultJoin("Ce n'est pas la bonne phrase."); return; }
+    choosePin(async (pin) => {
+      busy("Préparation…");
+      await storeLocalKey(res.raw, pin);
+      KEY = res.key;
+      startApp();
+    });
+  };
+  vaultScreen(
+    h("h1", { text: "Phrase secrète" }),
+    h("div", { class: "vbox" },
+      h("p", { text: "Entre la phrase secrète que vous avez choisie. Elle est dans ton gestionnaire de mots de passe." }),
+      ta, err,
+      h("div", { class: "rowbtns" }, go),
+      h("div", { class: "rowbtns" }, h("button", { class: "link2", text: "Se déconnecter", onclick: signOut }))));
+  setTimeout(() => ta.focus(), 50);
+}
+
+/* Pavé numérique */
+function keypad({ title, sub, len, onDone, extra }) {
+  let pin = "";
+  const dots = h("div", { class: "dots" });
+  const err = h("div", { class: "err" });
+  const okBtn = len ? null : h("button", { class: "k-ok", text: "OK", disabled: true, onclick: () => pin.length >= 4 && done() });
+  const draw = () => {
+    const n = len || Math.max(4, pin.length);
+    dots.replaceChildren(...Array.from({ length: n }, (_, i) => h("i", { class: i < pin.length ? "on" : "" })));
+    if (okBtn) okBtn.disabled = pin.length < 4;
+  };
+  let locked = false;
+  const done = async () => {
+    locked = true;
+    const r = await onDone(pin);
+    if (r && r.error) {
+      pin = ""; draw(); err.textContent = r.error;
+      dots.classList.remove("shake"); void dots.offsetWidth; dots.classList.add("shake");
+      locked = false;
+    }
+  };
+  const press = (d) => {
+    if (locked) return;
+    if (pin.length >= (len || 6)) return;
+    pin += d; err.textContent = ""; draw();
+    if (len && pin.length === len) setTimeout(done, 80);
+  };
+  const del = () => { if (!locked) { pin = pin.slice(0, -1); draw(); } };
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => h("button", { text: d, onclick: () => press(d) }));
+  const pad = h("div", { class: "keypad" }, ...keys,
+    okBtn || h("button", { class: "k-blank" }),
+    h("button", { text: "0", onclick: () => press("0") }),
+    h("button", { class: "k-fn", "aria-label": "Effacer", onclick: del }, ICON.back()));
+  const onKey = (e) => {
+    if ($("#s-vault").classList.contains("hidden") || !document.body.contains(pad)) { document.removeEventListener("keydown", onKey); return; }
+    if (/^[0-9]$/.test(e.key)) press(e.key);
+    else if (e.key === "Backspace") del();
+    else if (e.key === "Enter" && okBtn && pin.length >= 4) done();
+  };
+  document.addEventListener("keydown", onKey);
+  draw();
+  vaultScreen(h("h1", { text: title }), sub ? h("p", { text: sub }) : null, dots, err, pad, extra || null);
+}
+
+function choosePin(then) {
+  keypad({
+    title: "Choisis ton NIP",
+    sub: "4 à 6 chiffres. Tu le taperas à chaque ouverture de l'app sur cet appareil.",
+    onDone: (pin) => {
+      keypad({
+        title: "Confirme ton NIP", len: pin.length,
+        onDone: (pin2) => pin2 === pin ? then(pin) : (setTimeout(() => choosePin(then), 900), { error: "Les NIP ne correspondent pas." }),
+      });
+    },
+  });
+}
+
+function vaultPin(msg) {
+  const r = lsGet("key");
+  keypad({
+    title: "Entre ton NIP", len: r.len, sub: msg,
+    onDone: async (pin) => {
+      try {
+        const raw = await unlockLocalKey(pin);
+        KEY = await aesKey(raw);
+        lsSet("fails", 0);
+        startApp();
+      } catch {
+        const fails = (+lsGet("fails") || 0) + 1;
+        lsSet("fails", fails);
+        if (fails >= MAX_PIN_FAILS) {
+          lsDel("key"); lsDel("fails");
+          vaultJoin("Trop d'essais : la phrase a été oubliée sur cet appareil. Entre-la de nouveau.");
+          return;
+        }
+        const left = MAX_PIN_FAILS - fails;
+        return { error: `Mauvais NIP. ${left} essai${left > 1 ? "s" : ""} restant${left > 1 ? "s" : ""}.` };
+      }
+    },
+    extra: h("div", { class: "rowbtns", style: "margin-top:10px" },
+      h("button", { class: "link2", text: "NIP oublié?", onclick: () => {
+        if (confirm("Oublier la phrase sur cet appareil? Tu devras la retaper pour choisir un nouveau NIP.")) { lsDel("key"); lsDel("fails"); vaultJoin(); }
+      } })),
+  });
+}
+
+async function createVault(phrase, pin) {
+  busy("Chiffrement en place…");
+  try {
+    const salt = rand(16);
+    const raw = await pbkdf2(phrase, salt, PHRASE_ITER);
+    const key = await aesKey(raw);
+    const check = await seal(key, te.encode(CHECK_TEXT));
+    const meta = { v: 1, salt: be.bytes(salt), iter: PHRASE_ITER, check: be.bytes(check), createdAt: be.ts() };
+    const created = await be.createIfAbsent("meta", "crypto", meta);
+    if (!created) { // Annie l'a créée au même moment
+      S.meta = await be.get("meta", "crypto", true);
+      vaultJoin("Une phrase secrète existe déjà. Entre celle qu'Annie a choisie.");
+      return;
+    }
+    S.meta = { salt, iter: PHRASE_ITER, check };
+    // efface l'ancien contenu non chiffré
+    const pairs = [];
+    for (const c of CONTENT) (await be.listIds(c)).forEach((id) => pairs.push([c, id]));
+    if (pairs.length) await be.removeMany(pairs);
+    await storeLocalKey(raw, pin);
+    KEY = key;
+    startApp();
+    toast("Chiffrement activé 🔒");
+  } catch (e) { onErr(e); }
+}
+
+/* ---------- Démarrage / verrouillage ---------- */
+const thumbCache = new Map(); // id → Promise<objectURL>
+function stopWatchers() { unsubs.forEach((u) => u()); unsubs = []; }
+function lockState() {
+  KEY = null;
+  stopWatchers();
+  closeViewerNow();
+  for (const p of thumbCache.values()) p.then((u) => URL.revokeObjectURL(u)).catch(() => {});
+  thumbCache.clear();
+  Object.assign(S, { messages: [], lists: [], items: [], photos: [], photosById: new Map(), photosLoaded: false });
+  ["#msgs", "#grid", "#list-cards", "#items-todo", "#items-done"].forEach((s) => $(s).replaceChildren());
+  $("#msgs").dataset.ready = "";
+  if (S.openList) closeListNow();
+}
+function lock() { if (!KEY) return; lockState(); vaultPin(); }
+$("#btn-lock").onclick = lock;
+
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (KEY && hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS) lock();
+});
+
+const seqs = {};
+function watchDec(col, opt, decode, apply) {
+  return be.watch(col, opt, async (docs) => {
+    const my = seqs[col] = (seqs[col] || 0) + 1;
+    const out = (await Promise.all(docs.map((d) => decode(d).catch(() => null)))).filter(Boolean);
+    if (my !== seqs[col] || !KEY) return;
+    apply(out);
+  }, onErr);
+}
+const decMessage = async (d) => d.e ? { id: d.id, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
+const decList = async (d) => d.e ? { id: d.id, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
+const decItem = async (d) => d.e ? { id: d.id, listId: d.listId, done: !!d.done, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
+async function decPhoto(d) {
+  if (!d.t) return null;
+  if (!thumbCache.has(d.id)) thumbCache.set(d.id, decBlob(d.t).then((b) => URL.createObjectURL(b)));
+  let thumb;
+  try { thumb = await thumbCache.get(d.id); } catch (e) { thumbCache.delete(d.id); throw e; }
+  const caption = d.c ? (await decJ(d.c)).caption || "" : "";
+  return { id: d.id, by: d.by, createdAt: d.createdAt, w: d.w, h: d.h, thumb, caption };
+}
+
+function startApp() {
   showScreen("app");
-  be.set("users", u.uid, { name: S.me.name, photo: S.me.photo }, true).catch(onErr);
+  stopWatchers();
   unsubs.push(
     be.watch("users", {}, (d) => { S.users = Object.fromEntries(d.map((x) => [x.id, x])); renderHeader(); renderChat(); }, onErr),
-    be.watch("messages", { orderBy: ["createdAt", "desc"], limit: 300 }, (d) => { S.messages = d.reverse(); renderChat(); onNewMessages(); }, onErr),
-    be.watch("lists", { orderBy: ["createdAt", "asc"] }, (d) => { S.lists = d; renderLists(); }, onErr),
-    be.watch("items", { orderBy: ["createdAt", "asc"] }, (d) => { S.items = d; renderLists(); }, onErr),
-    be.watch("photos", { orderBy: ["createdAt", "desc"] }, (d) => { S.photos = d; renderPhotos(); if (S.viewer) refreshViewer(); }, onErr),
+    watchDec("messages", { orderBy: ["createdAt", "desc"], limit: 300 }, decMessage, (d) => { S.messages = d.reverse(); renderChat(); onNewMessages(); }),
+    watchDec("lists", { orderBy: ["createdAt", "asc"] }, decList, (d) => { S.lists = d; renderLists(); }),
+    watchDec("items", { orderBy: ["createdAt", "asc"] }, decItem, (d) => { S.items = d; renderLists(); }),
+    watchDec("photos", { orderBy: ["createdAt", "desc"] }, decPhoto, (d) => {
+      S.photos = d; S.photosById = new Map(d.map((p) => [p.id, p])); S.photosLoaded = true;
+      renderPhotos(); renderChat(); if (S.viewer) refreshViewer();
+    }),
   );
+  renderHeader();
   renderSendBtn();
+  setTab(S.view);
 }
 
 $("#btn-login").onclick = async () => {
@@ -593,7 +944,8 @@ $("#btn-login").onclick = async () => {
     p.classList.remove("hidden");
   }
 };
-document.addEventListener("click", (e) => { if (e.target.closest("[data-signout]")) be?.signOut(); });
+function signOut() { if (S.me) { lsDel("key"); lsDel("fails"); } lockState(); be?.signOut(); }
+document.addEventListener("click", (e) => { if (e.target.closest("[data-signout]")) signOut(); });
 
 /* ---------- En-tête ---------- */
 const partner = () => Object.values(S.users).find((u) => u.id !== S.me?.uid);
@@ -604,12 +956,13 @@ function avatarEl(u) {
   return a;
 }
 function renderHeader() {
+  if (!S.me) return;
   const me = S.users[S.me.uid] || { name: S.me.name, photo: S.me.photo };
   const p = partner();
   $("#btn-me").replaceChildren(...(p ? [avatarEl(p)] : []), avatarEl(me));
 }
 $("#btn-me").onclick = () => {
-  if (confirm(`Connecté en tant que ${S.me.name}${S.me.email ? " (" + S.me.email + ")" : ""}.\n\nSe déconnecter?`)) be.signOut();
+  if (confirm(`Connecté en tant que ${S.me.name}${S.me.email ? " (" + S.me.email + ")" : ""}.\n\nSe déconnecter? Tu devras retaper la phrase secrète sur cet appareil.`)) signOut();
 };
 
 /* ---------- Onglets ---------- */
@@ -620,21 +973,21 @@ function setTab(tab) {
   if (tab === "chat") { const m = $("#msgs"); m.scrollTop = m.scrollHeight; markSeen(); }
 }
 $$("nav.tabs button").forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
-document.addEventListener("focusin", (e) => { if (e.target.matches("textarea,input.txt")) document.body.classList.add("typing"); });
+document.addEventListener("focusin", (e) => { if (e.target.matches("textarea:not(.phrase),input.txt")) document.body.classList.add("typing"); });
 document.addEventListener("focusout", () => setTimeout(() => {
-  if (!document.activeElement?.matches("textarea,input.txt")) document.body.classList.remove("typing");
+  if (!document.activeElement?.matches("textarea:not(.phrase),input.txt")) document.body.classList.remove("typing");
 }, 50));
 
 /* ============================================================
    Jasette
    ============================================================ */
 function renderChat() {
-  if (!S.me) return;
+  if (!S.me || !KEY) return;
   const box = $("#msgs");
   const atBottom = !box.dataset.ready || box.scrollHeight - box.scrollTop - box.clientHeight < 120;
   const frag = document.createDocumentFragment();
   if (!S.messages.length) {
-    frag.append(h("div", { class: "empty" }, h("div", { class: "big", text: "💌" }), h("p", { text: "Écrivez-vous votre premier message." })));
+    frag.append(h("div", { class: "empty" }, h("div", { class: "big", text: "💌" }), h("p", { text: "Écrivez-vous votre premier message. Tout est chiffré 🔒" })));
   }
   const p = partner();
   const myLast = [...S.messages].reverse().find((m) => m.by === S.me.uid);
@@ -651,9 +1004,10 @@ function renderChat() {
     const row = h("div", { class: `row ${mine ? "me" : "them"}${first ? " first" : ""}` });
     let b;
     if (m.type === "photo") {
-      b = h("div", { class: "b photo" }, h("img", {
-        src: m.thumb, alt: "Photo", width: m.tw || 440, height: m.th || 440, onclick: () => openPhoto(m.photoId),
-      }));
+      const ph = S.photosById.get(m.photoId);
+      b = h("div", { class: "b photo" }, ph
+        ? h("img", { src: ph.thumb, alt: "Photo", width: m.tw || 440, height: m.th || 440, onclick: () => openPhoto(m.photoId) })
+        : h("div", { class: "ph", text: S.photosLoaded ? "Photo supprimée" : "…" }));
     } else {
       b = h("div", { class: "b" + (isEmojiOnly(m.text) ? " emoji" : "") });
       linkify(b, m.text || "");
@@ -685,24 +1039,25 @@ function renderSendBtn() {
 }
 function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight + 2, 132) + "px"; }
 input.addEventListener("input", () => { autosize(); renderSendBtn(); });
-$("#composer").onsubmit = (e) => {
+$("#composer").onsubmit = async (e) => {
   e.preventDefault();
+  if (!KEY) return;
   const text = input.value.trim() || "❤️";
   input.value = ""; autosize(); renderSendBtn();
-  const id = be.newId("messages");
-  be.set("messages", id, { by: S.me.uid, text, createdAt: be.ts() }).catch(onErr);
-  const box = $("#msgs"); box.dataset.ready = ""; // recoller en bas
+  $("#msgs").dataset.ready = ""; // recoller en bas
+  try { await be.set("messages", be.newId("messages"), { by: S.me.uid, e: await encJ({ text }), createdAt: be.ts() }); }
+  catch (err) { onErr(err); }
 };
 $("#btn-send").addEventListener("mousedown", (e) => e.preventDefault()); // garde le clavier ouvert
 
 $("#btn-chat-photo").onclick = () => $("#chat-file").click();
 $("#chat-file").onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = "";
-  if (!f) return;
-  toast("Envoi de la photo…", 0);
+  if (!f || !KEY) return;
+  toast("Chiffrement et envoi de la photo…", 0);
   try {
     const p = await uploadPhoto(f);
-    await be.set("messages", be.newId("messages"), { by: S.me.uid, type: "photo", photoId: p.id, thumb: p.thumb, tw: p.tw, th: p.th, createdAt: be.ts() });
+    await be.set("messages", be.newId("messages"), { by: S.me.uid, e: await encJ({ type: "photo", photoId: p.id, tw: p.tw, th: p.th }), createdAt: be.ts() });
     toast("Photo envoyée");
   } catch (err) { hideToast(); onErr(err); }
 };
@@ -710,7 +1065,7 @@ $("#chat-file").onchange = async (e) => {
 /* Vu / non lu */
 let lastPing = 0;
 function markSeen() {
-  if (!S.me || S.view !== "chat" || document.hidden) return;
+  if (!S.me || !KEY || S.view !== "chat" || document.hidden) return;
   try { localStorage.setItem("seen", String(Date.now())); } catch {}
   $("#chat-dot").classList.remove("show");
   navigator.clearAppBadge?.().catch(() => {});
@@ -736,7 +1091,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) mark
 function itemsOf(id) { return S.items.filter((i) => i.listId === id); }
 
 function renderLists() {
-  if (!S.me) return;
+  if (!S.me || !KEY) return;
   if (S.openList && !S.lists.find((l) => l.id === S.openList)) {
     if (Date.now() - S.openListAt > 3000) closeListNow();
   }
@@ -795,31 +1150,33 @@ function renderListDetail() {
   $("#items-done").replaceChildren(...done.map(itemRow));
 }
 
-$("#new-list").onsubmit = (e) => {
+$("#new-list").onsubmit = async (e) => {
   e.preventDefault();
   const title = $("#new-list-input").value.trim();
-  if (!title) return;
+  if (!title || !KEY) return;
   $("#new-list-input").value = "";
   $("#new-list-input").blur();
   const id = be.newId("lists");
-  be.set("lists", id, { title, by: S.me.uid, createdAt: be.ts() }).catch(onErr);
   openList(id);
+  try { await be.set("lists", id, { e: await encJ({ title }), by: S.me.uid, createdAt: be.ts() }); }
+  catch (err) { onErr(err); }
 };
-$("#new-item").onsubmit = (e) => {
+$("#new-item").onsubmit = async (e) => {
   e.preventDefault();
   const inp = $("#new-item-input");
   const text = inp.value.trim();
-  if (!text || !S.openList) return;
+  if (!text || !S.openList || !KEY) return;
   inp.value = "";
-  be.set("items", be.newId("items"), { listId: S.openList, text, done: false, by: S.me.uid, createdAt: be.ts() }).catch(onErr);
   inp.focus();
+  try { await be.set("items", be.newId("items"), { listId: S.openList, e: await encJ({ text }), done: false, by: S.me.uid, createdAt: be.ts() }); }
+  catch (err) { onErr(err); }
 };
 $("#new-item").querySelector("button").addEventListener("mousedown", (e) => e.preventDefault());
 $("#btn-list-back").onclick = closeList;
-$("#list-title").onclick = () => {
+$("#list-title").onclick = async () => {
   const l = S.lists.find((x) => x.id === S.openList);
   const t = prompt("Renommer la liste", l?.title || "");
-  if (t && t.trim()) be.update("lists", S.openList, { title: t.trim() }).catch(onErr);
+  if (t && t.trim() && l) be.update("lists", l.id, { e: await encJ({ title: t.trim() }) }).catch(onErr);
 };
 $("#btn-list-del").onclick = () => {
   const l = S.lists.find((x) => x.id === S.openList);
@@ -839,9 +1196,9 @@ $("#btn-clear-done").onclick = () => {
 async function uploadPhoto(file, caption = "") {
   const { full, thumb } = await compress(file);
   const id = be.newId("photos");
-  await be.set("photosFull", id, { data: full.url });
-  await be.set("photos", id, { thumb: thumb.url, caption, by: S.me.uid, w: full.w, h: full.h, createdAt: be.ts() });
-  return { id, thumb: thumb.url, tw: thumb.w, th: thumb.h };
+  await be.set("photosFull", id, { d: await encBlob(full.blob) });
+  await be.set("photos", id, { t: await encBlob(thumb.blob), c: await encJ({ caption }), by: S.me.uid, w: full.w, h: full.h, createdAt: be.ts() });
+  return { id, tw: thumb.w, th: thumb.h };
 }
 function renderPhotos() {
   const n = S.photos.length;
@@ -853,10 +1210,10 @@ function renderPhotos() {
 $("#btn-add-photos").onclick = () => $("#photo-files").click();
 $("#photo-files").onchange = async (e) => {
   const files = [...e.target.files]; e.target.value = "";
-  if (!files.length) return;
+  if (!files.length || !KEY) return;
   let ok = 0;
   for (const [i, f] of files.entries()) {
-    toast(files.length > 1 ? `Envoi ${i + 1} sur ${files.length}…` : "Envoi de la photo…", 0);
+    toast(files.length > 1 ? `Chiffrement et envoi ${i + 1} sur ${files.length}…` : "Chiffrement et envoi de la photo…", 0);
     try { await uploadPhoto(f); ok++; } catch (err) { console.error(err); }
   }
   toast(ok === files.length ? (ok > 1 ? `${ok} photos ajoutées` : "Photo ajoutée") : `${ok} sur ${files.length} photos ajoutées`);
@@ -865,21 +1222,27 @@ $("#photo-files").onchange = async (e) => {
 /* Visionneuse */
 const V = $("#viewer"), VI = $("#v-img");
 async function openPhoto(id) {
-  const p = S.photos.find((x) => x.id === id);
+  const p = S.photosById.get(id);
   if (!p) { toast("Cette photo a été supprimée."); return; }
-  S.viewer = { id, full: null };
+  S.viewer = { id, fullURL: null, fullBlob: null };
   V.classList.remove("hidden");
   history.pushState({ v: 1 }, "");
   VI.src = p.thumb; VI.classList.add("loading");
   refreshViewer();
   try {
     const f = await be.get("photosFull", id);
-    if (S.viewer?.id === id && f?.data) { S.viewer.full = f.data; VI.src = f.data; }
+    if (S.viewer?.id === id && f?.d) {
+      const blob = await decBlob(f.d);
+      if (S.viewer?.id !== id) return;
+      S.viewer.fullBlob = blob;
+      S.viewer.fullURL = URL.createObjectURL(blob);
+      VI.src = S.viewer.fullURL;
+    }
   } catch (e) { console.error(e); }
   VI.classList.remove("loading");
 }
 function refreshViewer() {
-  const p = S.photos.find((x) => x.id === S.viewer.id);
+  const p = S.photosById.get(S.viewer.id);
   if (!p) { closeViewerNow(); return; }
   const cap = $("#v-cap");
   cap.textContent = p.caption || "Ajouter une légende…";
@@ -887,14 +1250,17 @@ function refreshViewer() {
   const who = p.by === S.me.uid ? "toi" : (S.users[p.by]?.name || "l'autre");
   $("#v-meta").textContent = `Ajoutée par ${who} · ${fmtDate(p.createdAt)}`;
 }
-function closeViewerNow() { S.viewer = null; V.classList.add("hidden"); VI.removeAttribute("src"); }
+function closeViewerNow() {
+  if (S.viewer?.fullURL) URL.revokeObjectURL(S.viewer.fullURL);
+  S.viewer = null; V.classList.add("hidden"); VI.removeAttribute("src");
+}
 function closeViewer() { if (history.state?.v) history.back(); else closeViewerNow(); }
 $("#v-close").onclick = closeViewer;
-$("#v-cap").onclick = () => {
-  const p = S.photos.find((x) => x.id === S.viewer?.id);
+$("#v-cap").onclick = async () => {
+  const p = S.photosById.get(S.viewer?.id);
   if (!p) return;
   const t = prompt("Légende", p.caption || "");
-  if (t !== null) be.update("photos", p.id, { caption: t.trim() }).catch(onErr);
+  if (t !== null) be.update("photos", p.id, { c: await encJ({ caption: t.trim() }) }).catch(onErr);
 };
 $("#v-del").onclick = () => {
   const id = S.viewer?.id;
@@ -903,16 +1269,17 @@ $("#v-del").onclick = () => {
   be.removeMany([["photos", id], ["photosFull", id]]).catch(onErr);
 };
 $("#v-save").onclick = async () => {
-  const p = S.photos.find((x) => x.id === S.viewer?.id);
-  const data = S.viewer?.full || p?.thumb;
-  if (!data) return;
-  const name = `photo-${(p?.createdAt || new Date()).toISOString().slice(0, 10)}.jpg`;
+  const p = S.photosById.get(S.viewer?.id);
+  if (!p) return;
+  const name = `photo-${(p.createdAt || new Date()).toISOString().slice(0, 10)}.jpg`;
   try {
-    const blob = await (await fetch(data)).blob();
+    const blob = S.viewer.fullBlob || await (await fetch(p.thumb)).blob();
     const file = new File([blob], name, { type: "image/jpeg" });
     if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file] }); return; }
-    const a = h("a", { href: URL.createObjectURL(blob), download: name });
+    const url = URL.createObjectURL(blob);
+    const a = h("a", { href: url, download: name });
     document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (e) { if (e.name !== "AbortError") toast("Impossible d'enregistrer la photo"); }
 };
 

@@ -45,6 +45,11 @@ svg{display:block}
 #app{height:100dvh;display:flex;flex-direction:column;max-width:640px;margin:0 auto}
 header.top{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 16px 8px}
 .brand{font-weight:800;font-size:21px;letter-spacing:-.02em;flex:1;display:flex;align-items:center;gap:8px}
+.brand{min-width:0;white-space:nowrap;overflow:hidden}
+.brand span{overflow:hidden;text-overflow:ellipsis}
+header.top{gap:2px}
+header.top .plain{width:40px;height:40px}
+header.top .pair{margin-left:6px}
 .brand svg{color:var(--accent);width:22px;height:22px}
 .avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;background:var(--surface2);display:grid;place-items:center;font-weight:800;font-size:14px;color:var(--muted);flex:none;border:0;overflow:hidden}
 .avatar img{width:100%;height:100%;object-fit:cover}
@@ -220,6 +225,42 @@ textarea.txt{resize:vertical;min-height:70px;font:inherit}
 .detail .k{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
 .detail a{color:var(--accent);font-weight:800}
 
+/* Réactions */
+.b{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.reacts{display:flex;gap:3px;margin:-7px 10px 0;padding:2px 7px;background:var(--surface);border:1px solid var(--line);border-radius:999px;font-size:14px;line-height:1.3;position:relative;z-index:1;box-shadow:var(--shadow);font-weight:800;color:var(--muted)}
+.emoji-row{display:flex;justify-content:space-between;gap:4px}
+.emoji-row button{font-size:28px;border:0;background:var(--surface);border-radius:50%;width:50px;height:50px;display:grid;place-items:center;padding:0}
+.emoji-row button.on{background:var(--accent)}
+/* Bulle d'appel */
+.callb{display:flex;align-items:center;gap:10px;cursor:pointer}
+.callb .ci{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.22);flex:none}
+.them .callb .ci{background:var(--surface2)}
+.callb .ci svg{width:19px;height:19px}
+.callb .ct{font-weight:800}
+.callb .cs{font-size:13px;opacity:.8}
+.callb.missed .ci{background:#e5394b;color:#fff}
+/* Écran d'appel */
+.call{position:fixed;inset:0;z-index:50;background:#140d10;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 64px) 20px calc(env(safe-area-inset-bottom) + 40px)}
+#call-remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;opacity:0;transition:opacity .3s}
+.call.has-video #call-remote{opacity:1}
+#call-local{position:absolute;right:14px;top:calc(env(safe-area-inset-top) + 14px);width:104px;height:146px;object-fit:cover;border-radius:16px;border:2px solid rgba(255,255,255,.7);background:#222;z-index:3}
+.call-info{position:relative;z-index:2;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.call-av{width:116px;height:116px;border-radius:50%;background:#3b2a31;display:grid;place-items:center;font-size:46px;font-weight:800;overflow:hidden;margin-bottom:8px}
+.call-av img{width:100%;height:100%;object-fit:cover}
+.call-av.pulse{animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(240,122,142,.55)}70%{box-shadow:0 0 0 28px rgba(240,122,142,0)}100%{box-shadow:0 0 0 0 rgba(240,122,142,0)}}
+.call.has-video .call-av{display:none}
+.call.has-video .call-info{margin-top:auto;margin-bottom:24px}
+.call-name{font-size:28px;font-weight:800}
+.call-status{font-size:16px;opacity:.9;font-weight:700;font-variant-numeric:tabular-nums}
+.call-actions{position:relative;z-index:2;display:flex;gap:18px;justify-content:center;flex-wrap:wrap}
+.cbtn-wrap{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:12px;font-weight:700;min-width:70px}
+.cbtn{width:64px;height:64px;border-radius:50%;border:0;display:grid;place-items:center;background:rgba(255,255,255,.2);color:#fff;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.cbtn svg{width:28px;height:28px}
+.cbtn.off{background:#fff;color:#111}
+.cbtn.red{background:#e5394b}
+.cbtn.green{background:#2fb36d;animation:pulse 1.6s infinite}
+
 /* Toast */
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 84px);transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:999px;font-weight:700;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:30;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -268,6 +309,8 @@ textarea.txt{resize:vertical;min-height:70px;font:inherit}
 <div id="app" class="hidden">
   <header class="top">
     <div class="brand"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 2.9 4.5 6.6 4.5c2.2 0 3.6 1.2 4.4 2.5.8-1.3 2.2-2.5 4.4-2.5 3.7 0 5.7 3.9 4.2 7.3C19.5 16.4 12 21 12 21z"/></svg><span class="appname">Nous deux</span></div>
+    <button class="plain" id="btn-call-audio" aria-label="Appel audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></button>
+    <button class="plain" id="btn-call-video" aria-label="Appel vidéo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg></button>
     <button class="plain" id="btn-lock" aria-label="Verrouiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></button>
     <button class="pair" id="btn-me" style="border:0;background:none" aria-label="Compte"></button>
   </header>
@@ -364,6 +407,18 @@ textarea.txt{resize:vertical;min-height:70px;font:inherit}
       Photos
     </button>
   </nav>
+</div>
+
+<!-- Appel -->
+<div class="call hidden" id="call">
+  <video id="call-remote" autoplay playsinline></video>
+  <video id="call-local" autoplay playsinline muted class="hidden"></video>
+  <div class="call-info">
+    <div class="call-av" id="call-av"></div>
+    <div class="call-name" id="call-name"></div>
+    <div class="call-status" id="call-status"></div>
+  </div>
+  <div class="call-actions" id="call-actions"></div>
 </div>
 
 <!-- Visionneuse photo -->
@@ -613,6 +668,9 @@ async function firebaseBackend() {
       const v = out[k];
       if (v instanceof F.Bytes) out[k] = v.toUint8Array();
       else if (v && typeof v.toDate === "function") out[k] = v.toDate();
+      else if (v && typeof v === "object" && !Array.isArray(v)) {
+        out[k] = Object.fromEntries(Object.entries(v).map(([kk, vv]) => [kk, vv instanceof F.Bytes ? vv.toUint8Array() : vv]));
+      }
     }
     return out;
   };
@@ -630,6 +688,8 @@ async function firebaseBackend() {
     async deleteMessagingToken() { const m = await M(); messaging ??= m.getMessaging(app); return m.deleteToken(messaging); },
     arrayUnion: (...v) => F.arrayUnion(...v),
     arrayRemove: (...v) => F.arrayRemove(...v),
+    deleteField: () => F.deleteField(),
+    watchDoc: (col, id, cb) => F.onSnapshot(F.doc(db, col, id), (s) => cb(s.exists() ? conv(s) : null), (e) => console.warn(e)),
     async signIn() {
       const p = new A.GoogleAuthProvider();
       p.setCustomParameters({ prompt: "select_account" });
@@ -682,10 +742,12 @@ async function firebaseBackend() {
 }
 
 function demoBackend() {
+  // Mode démo : données en mémoire, partagées entre les onglets ouverts (pour tester à deux).
+  // ?demo = « Toi », ?demo&as=elle = « Ton amour »
   const store = {};
-  const subs = [];
+  const subs = [], docSubs = [];
   let n = 0;
-  const nid = () => "d" + (++n) + Math.random().toString(36).slice(2, 7);
+  const nid = () => "d" + Date.now().toString(36) + (++n) + Math.random().toString(36).slice(2, 6);
   const col = (c) => (store[c] ??= new Map());
   const run = (s) => {
     let docs = [...col(s.col).entries()].map(([id, d]) => ({ id, ...d }));
@@ -696,27 +758,61 @@ function demoBackend() {
     if (s.opt.limit) docs = docs.slice(0, s.opt.limit);
     setTimeout(() => s.cb(docs));
   };
-  const emit = (c) => subs.filter((s) => s.col === c).forEach(run);
+  const emit = (c, id) => {
+    subs.filter((s) => s.col === c).forEach(run);
+    docSubs.filter((s) => s.col === c && (!id || s.id === id)).forEach((s) => { const d = col(c).get(s.id); setTimeout(() => s.cb(d ? { id: s.id, ...d } : null)); });
+  };
   const fix = (d) => { const o = { ...d }; for (const k in o) if (o[k] === "__TS__") o[k] = new Date(); return o; };
+  const applyUpdate = (cur, data) => {
+    const o0 = { ...cur };
+    for (const [k, v] of Object.entries(data)) {
+      const parts = k.split(".");
+      let o = o0;
+      for (let i = 0; i < parts.length - 1; i++) { o[parts[i]] = { ...(o[parts[i]] || {}) }; o = o[parts[i]]; }
+      if (v === "__DEL__") delete o[parts.at(-1)]; else o[parts.at(-1)] = v;
+    }
+    return o0;
+  };
+  const ops = {
+    set(c, id, data, merge) { const m = col(c); m.set(id, merge ? { ...(m.get(id) || {}), ...data } : data); emit(c, id); },
+    update(c, id, data) { const m = col(c); m.set(id, applyUpdate(m.get(id) || {}, data)); emit(c, id); },
+    remove(c, id) { col(c).delete(id); emit(c, id); },
+  };
+  let bc = null;
+  try { bc = new BroadcastChannel("nous-deux-demo"); } catch {}
+  const share = (op, ...args) => { ops[op](...args); try { bc?.postMessage({ op, args }); } catch {} };
+  if (bc) {
+    bc.onmessage = (e) => {
+      const m = e.data;
+      if (m.op === "hello") { const dump = {}; for (const [c, mp] of Object.entries(store)) dump[c] = [...mp.entries()]; bc.postMessage({ op: "dump", dump }); }
+      else if (m.op === "dump") { for (const [c, entries] of Object.entries(m.dump)) for (const [id, d] of entries) if (!col(c).has(id)) col(c).set(id, d); Object.keys(m.dump).forEach((c) => emit(c)); }
+      else if (ops[m.op]) ops[m.op](...m.args);
+    };
+    bc.postMessage({ op: "hello" });
+  }
   window.__demoStore = store; // pour les tests
-  col("users").set("elle", { name: "Ton amour", photo: "", lastSeen: new Date() });
+  const asElle = new URLSearchParams(location.search).get("as") === "elle";
+  const me = asElle ? { uid: "elle", displayName: "Ton amour", photoURL: "", email: "elle@demo.ca" } : { uid: "moi", displayName: "Toi", photoURL: "", email: "toi@demo.ca" };
+  if (!asElle && !col("users").has("elle")) col("users").set("elle", { name: "Ton amour", photo: "", lastSeen: new Date() });
   return {
     demo: true,
     signIn() {}, signOut() { location.href = location.pathname + "?demo"; },
-    onUser(cb) { setTimeout(() => cb({ uid: "moi", displayName: "Toi", photoURL: "", email: "toi@demo.ca" })); return () => {}; },
+    onUser(cb) { setTimeout(() => cb(me), 250); return () => {}; },
     async messagingToken() { throw Object.assign(new Error("Pas disponible en démo"), { code: "unsupported" }); },
     async deleteMessagingToken() {},
     arrayUnion: (...v) => v,
     arrayRemove: () => [],
+    deleteField: () => "__DEL__",
     watch(c, opt, cb) { const s = { col: c, opt, cb }; subs.push(s); run(s); return () => subs.splice(subs.indexOf(s), 1); },
+    watchDoc(c, id, cb) { const s = { col: c, id, cb }; docSubs.push(s); emit(c, id); return () => { const i = docSubs.indexOf(s); if (i >= 0) docSubs.splice(i, 1); }; },
     newId: () => nid(),
-    async set(c, id, data, merge) { const m = col(c); m.set(id, merge ? { ...(m.get(id) || {}), ...fix(data) } : fix(data)); emit(c); },
-    async update(c, id, data) { const m = col(c); m.set(id, { ...m.get(id), ...fix(data) }); emit(c); },
-    async remove(c, id) { col(c).delete(id); emit(c); },
+    async set(c, id, data, merge) { share("set", c, id, fix(data), merge); },
+    async update(c, id, data) { share("update", c, id, fix(data)); },
+    async remove(c, id) { share("remove", c, id); },
     async get(c, id) { const d = col(c).get(id); return d ? { id, ...d } : null; },
     async listIds(c) { return [...col(c).keys()]; },
-    async createIfAbsent(c, id, data) { if (col(c).has(id)) return false; col(c).set(id, fix(data)); return true; },
-    async removeMany(p) { p.forEach(([c, id]) => col(c).delete(id)); [...new Set(p.map((x) => x[0]))].forEach(emit); },
+    async createIfAbsent(c, id, data) { if (col(c).has(id)) return false; share("set", c, id, fix(data)); return true; },
+    async removeMany(p) { p.forEach(([c, id]) => share("remove", c, id)); },
     bytes: (u8) => u8,
     ts: () => "__TS__",
   };
@@ -1060,6 +1156,7 @@ function lockState() {
   Object.assign(S, { messages: [], lists: [], items: [], photos: [], photosById: new Map(), photosLoaded: false });
   ["#msgs", "#grid", "#list-cards", "#items-todo", "#items-done", "#cal-body"].forEach((s) => $(s).replaceChildren());
   S.events = []; msgSeen = null;
+  if (Call.id || Call.status) endCall();
   closeSheetNow();
   $("#msgs").dataset.ready = "";
   if (S.openList) closeListNow();
@@ -1070,7 +1167,7 @@ $("#btn-lock").onclick = lock;
 let hiddenAt = 0;
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) hiddenAt = Date.now();
-  else if (KEY && hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS) lock();
+  else if (KEY && !Call.status && hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS) lock();
 });
 
 const seqs = {};
@@ -1082,7 +1179,12 @@ function watchDec(col, opt, decode, apply) {
     apply(out);
   }, onErr);
 }
-const decMessage = async (d) => d.e ? { id: d.id, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
+async function decMessage(d) {
+  if (!d.e) return null;
+  const m = { id: d.id, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)), reactions: {} };
+  if (d.r) for (const [uid, v] of Object.entries(d.r)) { try { m.reactions[uid] = (await decJ(v)).emoji; } catch {} }
+  return m;
+}
 const decList = async (d) => d.e ? { id: d.id, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
 const decItem = async (d) => d.e ? { id: d.id, listId: d.listId, done: !!d.done, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
 async function decPhoto(d) {
@@ -1101,6 +1203,7 @@ function startApp() {
     be.watch("users", {}, (d) => { S.users = Object.fromEntries(d.map((x) => [x.id, x])); renderHeader(); renderChat(); renderNotifBanner(); }, onErr),
     watchDec("messages", { orderBy: ["createdAt", "desc"], limit: 300 }, decMessage, (d) => { S.messages = d.reverse(); renderChat(); onNewMessages(); bingIfNew(); }),
     watchDec("events", { orderBy: ["createdAt", "asc"] }, decEvent, (d) => { S.events = d; renderCal(); }),
+    be.watch("calls", { orderBy: ["createdAt", "desc"], limit: 3 }, onCalls, (e) => console.warn(e)),
     watchDec("lists", { orderBy: ["createdAt", "asc"] }, decList, (d) => { S.lists = d; renderLists(); }),
     watchDec("items", { orderBy: ["createdAt", "asc"] }, decItem, (d) => { S.items = d; renderLists(); }),
     watchDec("photos", { orderBy: ["createdAt", "desc"] }, decPhoto, (d) => {
@@ -1202,7 +1305,9 @@ function renderChat() {
     const last = !next || next.by !== m.by || nd - d > 5 * 60e3 || nd.toDateString() !== day;
     const row = h("div", { class: `row ${mine ? "me" : "them"}${first ? " first" : ""}` });
     let b;
-    if (m.type === "photo") {
+    if (m.type === "call") {
+      b = callBubble(m, mine);
+    } else if (m.type === "photo") {
       const ph = S.photosById.get(m.photoId);
       b = h("div", { class: "b photo" }, ph
         ? h("img", { src: ph.thumb, alt: "Photo", width: m.tw || 440, height: m.th || 440, onclick: () => openPhoto(m.photoId) })
@@ -1211,11 +1316,10 @@ function renderChat() {
       b = h("div", { class: "b" + (isEmojiOnly(m.text) ? " emoji" : "") });
       linkify(b, m.text || "");
     }
-    if (mine) b.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      if (confirm("Supprimer ce message?")) be.remove("messages", m.id).catch(onErr);
-    });
+    if (m.type !== "call") bindMessageGestures(b, m);
     row.append(b);
+    const rx = reactionsEl(m);
+    if (rx) row.append(rx);
     if (last) {
       let meta = fmtTime(m.createdAt);
       if (mine && m === myLast && p?.lastSeen && p.lastSeen >= d) meta += " · Vu";
@@ -1837,6 +1941,362 @@ function eventForm(ev) {
     h("label", { class: "field" }, "Lieu", f.loc),
     h("label", { class: "field" }, "Notes", f.notes)), [save]);
   if (!ev) setTimeout(() => f.title.focus(), 250);
+}
+
+/* ============================================================
+   Réactions aux messages
+   ============================================================ */
+const REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
+async function toggleReaction(m, emoji) {
+  const mineNow = m.reactions?.[S.me.uid];
+  const field = `r.${S.me.uid}`;
+  try {
+    if (mineNow === emoji) await be.update("messages", m.id, { [field]: be.deleteField() });
+    else await be.update("messages", m.id, { [field]: await encJ({ emoji }) });
+  } catch (e) { onErr(e); }
+}
+function openMessageActions(m) {
+  const mine = m.by === S.me.uid;
+  const cur = m.reactions?.[S.me.uid];
+  const row = h("div", { class: "emoji-row" }, ...REACTIONS.map((e) =>
+    h("button", { class: cur === e ? "on" : "", text: e, "aria-label": "Réagir " + e, onclick: () => { closeSheet(); toggleReaction(m, e); } })));
+  const actions = [];
+  if (m.text && m.type !== "photo" && m.type !== "call") actions.push(menuRow("📋", "Copier", "", async () => {
+    closeSheet();
+    try { await navigator.clipboard.writeText(m.text); toast("Copié"); } catch { toast("Impossible de copier"); }
+  }));
+  if (mine) actions.push(menuRow("🗑️", "Supprimer", "Pour vous deux", () => {
+    closeSheet();
+    if (confirm("Supprimer ce message pour vous deux?")) be.remove("messages", m.id).catch(onErr);
+  }));
+  openSheet("Réagir", h("div", { style: "display:flex;flex-direction:column;gap:12px" }, row, ...actions));
+}
+// appui long (téléphone), clic droit (ordi), double-tap = ❤️
+function bindMessageGestures(el, m) {
+  let timer = null, sx = 0, sy = 0, lastTap = 0, longDone = false;
+  el.addEventListener("pointerdown", (e) => {
+    sx = e.clientX; sy = e.clientY; longDone = false;
+    clearTimeout(timer);
+    timer = setTimeout(() => { longDone = true; navigator.vibrate?.(15); openMessageActions(m); }, 450);
+  });
+  el.addEventListener("pointermove", (e) => { if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 12) clearTimeout(timer); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach((t) => el.addEventListener(t, () => clearTimeout(timer)));
+  el.addEventListener("contextmenu", (e) => { e.preventDefault(); if (!longDone) openMessageActions(m); });
+  el.addEventListener("click", (e) => {
+    if (longDone) { e.preventDefault(); e.stopPropagation(); return; }
+    const now = Date.now();
+    if (now - lastTap < 320) { lastTap = 0; e.preventDefault(); e.stopPropagation(); if (m.reactions?.[S.me.uid] !== "❤️") toggleReaction(m, "❤️"); }
+    else lastTap = now;
+  }, true);
+}
+function reactionsEl(m) {
+  const vals = Object.values(m.reactions || {});
+  if (!vals.length) return null;
+  const counts = new Map();
+  vals.forEach((e) => counts.set(e, (counts.get(e) || 0) + 1));
+  return h("button", { class: "reacts", "aria-label": "Réactions", onclick: () => openMessageActions(m) },
+    ...[...counts].map(([e, n]) => h("span", { text: n > 1 ? `${e}${n}` : e })));
+}
+
+/* ============================================================
+   Appels audio et vidéo (WebRTC, d'appareil à appareil)
+   Les échanges de connexion passent par Firestore, chiffrés avec
+   votre clé. Le son et l'image vont directement d'un téléphone à
+   l'autre, chiffrés (DTLS-SRTP).
+   ============================================================ */
+const ICE_SERVERS = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+const Call = { id: null, pc: null, local: null, video: false, role: null, status: null, unsub: null, timer: null, timeout: null,
+  started: 0, facing: "user", muted: false, camOff: false, ring: null, offerEnc: null, handled: new Set(), wake: null };
+const CI = {
+  phone: () => svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'),
+  hang: () => svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(135deg)"'),
+  video: () => svg('<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"'),
+  videoOff: () => svg('<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3zM3 3l18 18"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"'),
+  mic: () => svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"'),
+  micOff: () => svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"'),
+  flip: () => svg('<path d="M4 8h12l-3-3M20 16H8l3 3"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'),
+};
+const fmtDur = (s) => `${Math.floor(s / 60)}:${pad2(s % 60)}`;
+function micErr(e) {
+  if (e?.name === "NotAllowedError") return "Permets l'accès au micro (et à la caméra) dans les réglages du navigateur.";
+  if (e?.name === "NotFoundError") return "Aucun micro ou caméra trouvé sur cet appareil.";
+  return "Impossible d'accéder au micro/caméra : " + (e?.message || e);
+}
+
+/* Sonneries (générées, pas de fichier audio) */
+function tone(freqs, dur, vol = 0.18) {
+  if (!audioCtx) return;
+  try {
+    const t = audioCtx.currentTime;
+    freqs.forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain(), s = t + i * dur;
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(vol, s + 0.03);
+      g.gain.setValueAtTime(vol, s + dur - 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + dur);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(s); o.stop(s + dur + 0.02);
+    });
+  } catch {}
+}
+function startRing(kind) {
+  stopRing();
+  const play = kind === "in"
+    ? () => { tone([784, 988, 1175, 988], 0.18, 0.22); navigator.vibrate?.([400, 200, 400]); }
+    : () => tone([440, 440], 0.9, 0.08);
+  play();
+  Call.ring = setInterval(play, kind === "in" ? 2500 : 4000);
+}
+function stopRing() { clearInterval(Call.ring); Call.ring = null; navigator.vibrate?.(0); }
+
+/* Écran d'appel */
+function setCallStatus(t) { $("#call-status").textContent = t; }
+function showCallUI() {
+  const p = partner();
+  const av = $("#call-av");
+  av.replaceChildren(...(p?.photo ? [h("img", { src: p.photo, alt: "", referrerpolicy: "no-referrer" })] : [document.createTextNode((p?.name || "?").slice(0, 1).toUpperCase())]));
+  av.classList.toggle("pulse", true);
+  $("#call-name").textContent = p?.name || "Ton amour";
+  $("#call").classList.remove("hidden");
+  $("#call").classList.toggle("is-video", Call.video);
+  renderCallActions();
+}
+function updateCallUI() {
+  const remote = $("#call-remote");
+  const hasRemoteVideo = !!remote.srcObject?.getVideoTracks().some((t) => t.readyState === "live" && !t.muted);
+  $("#call").classList.toggle("has-video", Call.video && hasRemoteVideo && !!Call.started);
+  $("#call-av").classList.toggle("pulse", !Call.started);
+}
+function cbtn(icon, label, cls, onclick) {
+  return h("div", { class: "cbtn-wrap" }, h("button", { class: "cbtn " + (cls || ""), "aria-label": label, onclick }, icon), h("span", { text: label }));
+}
+function renderCallActions() {
+  const box = $("#call-actions");
+  if (Call.status === "incoming") {
+    box.replaceChildren(
+      cbtn(CI.hang(), "Refuser", "red", declineCall),
+      cbtn(Call.video ? CI.video() : CI.phone(), "Répondre", "green", acceptCall));
+    return;
+  }
+  const btns = [cbtn(Call.muted ? CI.micOff() : CI.mic(), Call.muted ? "Micro coupé" : "Micro", Call.muted ? "off" : "", toggleMute)];
+  if (Call.video) {
+    btns.push(cbtn(Call.camOff ? CI.videoOff() : CI.video(), Call.camOff ? "Caméra coupée" : "Caméra", Call.camOff ? "off" : "", toggleCam));
+    btns.push(cbtn(CI.flip(), "Retourner", "", flipCam));
+  }
+  btns.push(cbtn(CI.hang(), "Raccrocher", "red", () => endCall()));
+  box.replaceChildren(...btns);
+}
+function attachLocal() {
+  const v = $("#call-local");
+  v.srcObject = Call.local;
+  v.classList.toggle("hidden", !Call.video);
+  v.style.transform = Call.facing === "user" ? "scaleX(-1)" : "none";
+}
+function startTimer() {
+  clearInterval(Call.timer);
+  const tick = () => setCallStatus(fmtDur(Math.round((Date.now() - Call.started) / 1000)));
+  tick();
+  Call.timer = setInterval(tick, 1000);
+}
+
+/* Connexion WebRTC */
+function waitIce(pc, ms = 3500) {
+  return new Promise((res) => {
+    if (pc.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, ms);
+    pc.addEventListener("icegatheringstatechange", () => { if (pc.iceGatheringState === "complete") { clearTimeout(t); res(); } });
+  });
+}
+function newPC() {
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  pc.ontrack = (e) => {
+    const v = $("#call-remote");
+    if (v.srcObject !== e.streams[0]) v.srcObject = e.streams[0];
+    v.play?.().catch(() => {});
+    e.track.onunmute = updateCallUI; e.track.onmute = updateCallUI;
+    updateCallUI();
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc !== Call.pc) return;
+    const st = pc.connectionState;
+    if (st === "connected") {
+      stopRing();
+      if (!Call.started) { Call.started = Date.now(); startTimer(); }
+      clearTimeout(Call.timeout);
+      updateCallUI();
+    } else if (st === "disconnected") setCallStatus("Reconnexion…");
+    else if (st === "failed") { toast("La connexion a échoué. Réessaie, idéalement en Wi-Fi.", 6000); endCall("failed"); }
+  };
+  return pc;
+}
+const getMedia = (video) => navigator.mediaDevices.getUserMedia({
+  audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  video: video ? { facingMode: Call.facing, width: { ideal: 1280 }, height: { ideal: 720 } } : false,
+});
+async function keepAwake() { try { Call.wake = await navigator.wakeLock?.request("screen"); } catch {} }
+
+async function startCall(video) {
+  if (Call.id || Call.status) return;
+  if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) { toast("Ce navigateur ne permet pas les appels."); return; }
+  if (!partner()) { toast("Ton amour doit avoir ouvert l'app au moins une fois."); return; }
+  Object.assign(Call, { role: "caller", video, status: "calling", started: 0, muted: false, camOff: false, facing: "user" });
+  showCallUI();
+  setCallStatus("Préparation…");
+  try { Call.local = await getMedia(video); }
+  catch (e) { resetCall(); toast(micErr(e), 6000); return; }
+  attachLocal();
+  keepAwake();
+  try {
+    const pc = Call.pc = newPC();
+    Call.local.getTracks().forEach((t) => pc.addTrack(t, Call.local));
+    await pc.setLocalDescription(await pc.createOffer());
+    await waitIce(pc);
+    if (Call.pc !== pc) return; // annulé entre-temps
+    const id = Call.id = be.newId("calls");
+    Call.handled.add(id);
+    await be.set("calls", id, { by: S.me.uid, video, status: "ringing", offer: await encJ(pc.localDescription.toJSON()), createdAt: be.ts() });
+    setCallStatus("Ça sonne…");
+    startRing("back");
+    Call.unsub = be.watchDoc("calls", id, onCallDoc);
+    Call.timeout = setTimeout(() => { if (!Call.started) endCall("missed"); }, 45000);
+  } catch (e) { console.error(e); resetCall(); toast("Impossible de lancer l'appel : " + (e.message || e), 6000); }
+}
+
+function onCalls(docs) {
+  if (!KEY) return;
+  for (const d of docs) {
+    if (Call.handled.has(d.id)) continue;
+    const age = Date.now() - (+d.createdAt || 0);
+    if (d.by === S.me.uid || d.status !== "ringing" || age > 40e3) { Call.handled.add(d.id); continue; }
+    if (Call.id || Call.status) { // déjà en appel : occupé
+      Call.handled.add(d.id);
+      be.update("calls", d.id, { status: "declined", busy: true, endedAt: be.ts() }).catch(() => {});
+      continue;
+    }
+    incomingCall(d);
+  }
+}
+function incomingCall(d) {
+  Call.handled.add(d.id);
+  Object.assign(Call, { id: d.id, role: "callee", video: !!d.video, status: "incoming", started: 0, offerEnc: d.offer, muted: false, camOff: false, facing: "user" });
+  closeSheetNow();
+  showCallUI();
+  setCallStatus(d.video ? "Appel vidéo entrant…" : "Appel entrant…");
+  startRing("in");
+  Call.unsub = be.watchDoc("calls", d.id, onCallDoc);
+  Call.timeout = setTimeout(() => { if (Call.status === "incoming") resetCall(); }, 45000);
+}
+async function acceptCall() {
+  if (Call.status !== "incoming") return;
+  stopRing();
+  Call.status = "connecting";
+  setCallStatus("Connexion…");
+  renderCallActions();
+  try { Call.local = await getMedia(Call.video); }
+  catch (e) { toast(micErr(e), 6000); declineCall(); return; }
+  attachLocal();
+  keepAwake();
+  try {
+    const pc = Call.pc = newPC();
+    Call.local.getTracks().forEach((t) => pc.addTrack(t, Call.local));
+    await pc.setRemoteDescription(await decJ(Call.offerEnc));
+    await pc.setLocalDescription(await pc.createAnswer());
+    await waitIce(pc);
+    await be.update("calls", Call.id, { answer: await encJ(pc.localDescription.toJSON()), status: "active" });
+  } catch (e) { console.error(e); toast("Impossible de répondre : " + (e.message || e), 6000); endCall("failed"); }
+}
+function declineCall() {
+  if (Call.id) be.update("calls", Call.id, { status: "declined", endedAt: be.ts() }).catch(() => {});
+  resetCall();
+}
+async function onCallDoc(d) {
+  if (!d || d.id !== Call.id) return;
+  try {
+    if (Call.role === "caller" && d.answer && Call.pc && !Call.pc.currentRemoteDescription) {
+      stopRing();
+      setCallStatus("Connexion…");
+      Call.status = "connecting";
+      await Call.pc.setRemoteDescription(await decJ(d.answer));
+    }
+  } catch (e) { console.error(e); endCall("failed"); return; }
+  if (["ended", "declined", "missed", "cancelled", "failed"].includes(d.status)) {
+    if (Call.role === "caller" && d.status === "declined" && !Call.started) toast(d.busy ? `${partnerName()} est déjà en appel.` : `${partnerName()} ne peut pas répondre pour le moment.`, 4000);
+    finishLocal(d.status);
+  }
+}
+async function endCall(reason) {
+  if (!Call.id) { resetCall(); return; }
+  const status = Call.started ? "ended" : reason === "missed" ? "missed" : reason === "failed" ? "failed" : Call.role === "caller" ? "cancelled" : "declined";
+  const dur = Call.started ? Math.round((Date.now() - Call.started) / 1000) : 0;
+  be.update("calls", Call.id, { status, dur, endedAt: be.ts() }).catch(() => {});
+  finishLocal(status);
+}
+function finishLocal(status) {
+  if (!Call.id) { resetCall(); return; }
+  const info = { caller: Call.role === "caller", video: Call.video, dur: Call.started ? Math.round((Date.now() - Call.started) / 1000) : 0 };
+  resetCall();
+  if (info.caller) logCall(info, status); // l'appelant écrit le résumé dans la jasette
+}
+async function logCall(info, status) {
+  try {
+    await be.set("messages", be.newId("messages"), { by: S.me.uid, kind: "call", createdAt: be.ts(),
+      e: await encJ({ type: "call", video: info.video, status: info.dur ? "done" : status, dur: info.dur }) });
+  } catch (e) { console.warn(e); }
+}
+function resetCall() {
+  stopRing();
+  clearInterval(Call.timer); clearTimeout(Call.timeout);
+  Call.unsub?.();
+  try { Call.pc?.close(); } catch {}
+  Call.local?.getTracks().forEach((t) => t.stop());
+  try { Call.wake?.release(); } catch {}
+  $("#call-remote").srcObject = null;
+  $("#call-local").srcObject = null;
+  $("#call").classList.add("hidden");
+  $("#call").classList.remove("has-video", "is-video");
+  Object.assign(Call, { id: null, pc: null, local: null, role: null, status: null, unsub: null, timer: null, timeout: null, started: 0, offerEnc: null, wake: null });
+}
+
+/* Contrôles pendant l'appel */
+function toggleMute() {
+  Call.muted = !Call.muted;
+  Call.local?.getAudioTracks().forEach((t) => (t.enabled = !Call.muted));
+  renderCallActions();
+}
+function toggleCam() {
+  Call.camOff = !Call.camOff;
+  Call.local?.getVideoTracks().forEach((t) => (t.enabled = !Call.camOff));
+  $("#call-local").classList.toggle("hidden", Call.camOff);
+  renderCallActions();
+}
+async function flipCam() {
+  if (!Call.local || !Call.pc) return;
+  const facing = Call.facing === "user" ? "environment" : "user";
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } } });
+    const track = s.getVideoTracks()[0];
+    const sender = Call.pc.getSenders().find((x) => x.track?.kind === "video");
+    await sender?.replaceTrack(track);
+    Call.local.getVideoTracks().forEach((t) => { Call.local.removeTrack(t); t.stop(); });
+    Call.local.addTrack(track);
+    track.enabled = !Call.camOff;
+    Call.facing = facing;
+    attachLocal();
+  } catch (e) { toast("Impossible de changer de caméra"); }
+}
+$("#btn-call-audio").onclick = () => startCall(false);
+$("#btn-call-video").onclick = () => startCall(true);
+
+/* Bulle « appel » dans la jasette */
+function callBubble(m, mine) {
+  const missed = m.status === "missed" || m.status === "cancelled" || m.status === "declined" || m.status === "failed";
+  const kind = m.video ? "Appel vidéo" : "Appel audio";
+  const label = m.status === "done" ? kind : m.status === "declined" ? `${kind} refusé` : mine ? `${kind} sans réponse` : `${kind} manqué`;
+  const sub = m.status === "done" ? fmtDur(m.dur || 0) : "Toucher pour rappeler";
+  return h("div", { class: "b callb" + (missed && !mine ? " missed" : ""), onclick: () => startCall(!!m.video) },
+    h("span", { class: "ci" }, m.video ? CI.video() : CI.phone()),
+    h("span", {}, h("div", { class: "ct", text: label }), h("div", { class: "cs", text: sub })));
 }
 
 /* Bouton « retour » d'Android */

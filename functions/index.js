@@ -54,7 +54,7 @@ async function notifyOthers(by, makeBody, tag) {
 
 exports.notifierMessage = onDocumentCreated("messages/{id}", async (event) => {
   const msg = event.data && event.data.data();
-  if (!msg || !msg.by) return;
+  if (!msg || !msg.by || msg.kind === "call") return; // le résumé d'appel ne déclenche pas « t'a écrit »
   await notifyOthers(msg.by, (n) => `${n} t'a écrit 💌`, "message");
 });
 
@@ -62,6 +62,12 @@ exports.notifierEvenement = onDocumentCreated("events/{id}", async (event) => {
   const ev = event.data && event.data.data();
   if (!ev || !ev.by) return;
   await notifyOthers(ev.by, (n) => `${n} a ajouté un événement à l'agenda 📅`, "agenda");
+});
+
+exports.notifierAppel = onDocumentCreated("calls/{id}", async (event) => {
+  const c = event.data && event.data.data();
+  if (!c || !c.by || c.status !== "ringing") return;
+  await notifyOthers(c.by, (n) => `📞 ${n} t'appelle${c.video ? " en vidéo" : ""}… Touche pour répondre`, "call");
 });
 
 // Bouton « Tester les notifications » : envoie à TES appareils et note le résultat

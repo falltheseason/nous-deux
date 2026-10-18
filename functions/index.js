@@ -4,9 +4,13 @@
 
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { setGlobalOptions } = require("firebase-functions/v2");
-const admin = require("firebase-admin");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 
-admin.initializeApp();
+initializeApp();
+const db = getFirestore();
+const messaging = getMessaging();
 
 // La région doit correspondre à celle de la base Firestore (fournie au déploiement).
 setGlobalOptions({ region: process.env.ND_REGION || "northamerica-northeast1", maxInstances: 2 });
@@ -21,7 +25,7 @@ const BAD_TOKEN = new Set([
 async function sendTo(userDoc, data) {
   const tokens = (userDoc.get("fcm") || []).filter(Boolean);
   if (!tokens.length) return { total: 0, sent: 0, errors: [] };
-  const res = await admin.messaging().sendEachForMulticast({
+  const res = await messaging.sendEachForMulticast({
     tokens,
     data,
     webpush: { headers: { Urgency: "high", TTL: "86400" } },
@@ -33,13 +37,13 @@ async function sendTo(userDoc, data) {
     errors.push(code);
     if (BAD_TOKEN.has(code)) bad.push(tokens[i]);
   });
-  if (bad.length) await userDoc.ref.update({ fcm: admin.firestore.FieldValue.arrayRemove(...bad) });
+  if (bad.length) await userDoc.ref.update({ fcm: FieldValue.arrayRemove(...bad) });
   return { total: tokens.length, sent: res.successCount, errors };
 }
 
 // Prévient l'autre personne
 async function notifyOthers(by, makeBody, tag) {
-  const users = await admin.firestore().collection("users").get();
+  const users = await db.collection("users").get();
   const sender = users.docs.find((d) => d.id === by);
   const name = (sender && sender.get("name")) || "Ton amour";
   for (const u of users.docs) {
@@ -64,7 +68,7 @@ exports.notifierEvenement = onDocumentCreated("events/{id}", async (event) => {
 exports.testerNotification = onDocumentCreated("pings/{id}", async (event) => {
   const p = event.data && event.data.data();
   if (!p || !p.by) return;
-  const u = await admin.firestore().collection("users").doc(p.by).get();
+  const u = await db.collection("users").doc(p.by).get();
   let result;
   try {
     result = await sendTo(u, { title: "Nous deux", body: "Test réussi 🔔 Les notifications fonctionnent!", tag: "test", force: "1" });

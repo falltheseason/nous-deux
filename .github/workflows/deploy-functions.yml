@@ -1,0 +1,84 @@
+name: Déployer les notifications
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "functions/**"
+      - "firebase.json"
+      - ".github/workflows/deploy-functions.yml"
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: nous-2-48a67
+  PROJECT_NUMBER: "1009106158859"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - name: Vérifier la clé
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::notice::Secret FIREBASE_SERVICE_ACCOUNT absent : déploiement ignoré pour l'instant."
+          fi
+
+      - uses: actions/checkout@v4
+        if: env.HAS_KEY == 'true'
+
+      - uses: actions/setup-node@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          node-version: 22
+
+      - name: Connexion à Google Cloud
+        if: env.HAS_KEY == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        if: env.HAS_KEY == 'true'
+
+      - name: Activer les services nécessaires
+        if: env.HAS_KEY == 'true'
+        run: |
+          gcloud services enable \
+            calendar-json.googleapis.com \
+            cloudfunctions.googleapis.com cloudbuild.googleapis.com \
+            artifactregistry.googleapis.com run.googleapis.com \
+            eventarc.googleapis.com pubsub.googleapis.com \
+            fcm.googleapis.com fcmregistrations.googleapis.com \
+            firebaseinstallations.googleapis.com \
+            --project "$PROJECT_ID"
+
+      - name: Permissions de construction
+        if: env.HAS_KEY == 'true'
+        run: |
+          gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+            --role="roles/cloudbuild.builds.builder" --condition=None --quiet >/dev/null || true
+
+      - name: Région de la base de données
+        if: env.HAS_KEY == 'true'
+        run: |
+          loc=$(gcloud firestore databases describe --database='(default)' --project "$PROJECT_ID" --format='value(locationId)')
+          case "$loc" in
+            nam5) region=us-central1 ;;
+            eur3) region=europe-west1 ;;
+            *) region="$loc" ;;
+          esac
+          echo "Base Firestore : $loc → fonction : $region"
+          echo "FUNCTION_REGION=$region" > functions/.env
+
+      - name: Installer
+        if: env.HAS_KEY == 'true'
+        run: npm ci --prefix functions
+
+      - name: Déployer
+        if: env.HAS_KEY == 'true'
+        run: |
+          deploy() { npx -y firebase-tools@15 deploy --only functions --project "$PROJECT_ID" --force --non-interactive; }
+          deploy || { echo "Nouvel essai dans 90 s (première activation)…"; sleep 90; deploy; }

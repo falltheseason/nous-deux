@@ -1,6 +1,6 @@
 // Service worker : installation, ouverture rapide hors ligne et notifications.
 // Toujours « réseau d'abord » pour que les mises à jour arrivent tout de suite.
-const CACHE = "nous-deux-v3";
+const CACHE = "nous-deux-v4";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -33,15 +33,25 @@ self.addEventListener("push", (e) => {
   let p = {};
   try { p = e.data ? e.data.json() : {}; } catch { p = {}; }
   const d = p.data || p.notification || p;
-  const title = d.title || "Nous deux";
-  e.waitUntil(self.registration.showNotification(title, {
-    body: d.body || "Nouveau message 💌",
-    icon: "icon-192.png",
-    badge: "icon-192.png",
-    tag: d.tag || "nous-deux",
-    renotify: true,
-    data: { url: "./" },
-  }));
+  e.waitUntil((async () => {
+    // Si tu regardes déjà l'app sur cet appareil, pas de son (l'app fait son propre « bing »)
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const looking = d.force !== "1" && wins.some((c) => c.visibilityState === "visible" && c.focused);
+    await self.registration.showNotification(d.title || "Nous deux", {
+      body: d.body || "Nouveau message 💌",
+      icon: "icon-192.png",
+      badge: "icon-192.png",
+      tag: d.tag || "nous-deux",
+      renotify: !looking,
+      silent: looking,
+      vibrate: looking ? undefined : [120, 60, 120],
+      data: { url: "./" },
+    });
+    if (looking) {
+      const shown = await self.registration.getNotifications({ tag: d.tag || "nous-deux" });
+      shown.forEach((n) => n.close());
+    }
+  })());
 });
 
 self.addEventListener("notificationclick", (e) => {

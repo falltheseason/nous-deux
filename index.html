@@ -179,6 +179,21 @@ body.typing nav.tabs{display:none}
 .ev .t{font-size:13px;font-weight:800;color:var(--muted)}
 .ev .ttl{font-weight:800;font-size:16px;margin-top:2px;overflow-wrap:anywhere}
 .ev .loc{font-size:13px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.calhead{display:flex;align-items:center;gap:4px;padding:0 0 10px}
+.calhead h2{flex:1;font-size:20px;font-weight:800;text-align:center}
+.calhead h2::first-letter{text-transform:uppercase}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
+.mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dcell{aspect-ratio:1/1.08;border:0;border-radius:12px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:700;font-size:15px;padding:0}
+.dcell.out{opacity:.4;background:transparent}
+.dcell.today{box-shadow:inset 0 0 0 2px var(--accent);color:var(--accent);font-weight:800}
+.dcell.sel{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.dcell .dd{display:flex;gap:3px;height:6px}
+.dcell .dd i{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.dcell .dd i.them{background:var(--ok)}
+.dcell.sel .dd i{background:var(--accent-ink)}
+.ev.empty-ev{box-shadow:none;border-style:dashed;background:transparent}
+.ev.empty-ev .ttl{color:var(--accent)}
 .banner{display:flex;align-items:center;gap:8px;margin:2px 12px 6px;padding:8px 8px 8px 14px;border-radius:14px;background:var(--surface2);font-size:14px;font-weight:700}
 .banner span{flex:1}
 .banner .x{width:30px;height:30px}
@@ -310,13 +325,9 @@ textarea.txt{resize:vertical;min-height:70px;font:inherit}
     <!-- Agenda -->
     <section class="view" id="v-cal">
       <div class="scroll">
-        <div class="phead">
-          <span class="sub" id="cal-sub"></span>
-          <button class="plain hidden" id="btn-cal-refresh" aria-label="Actualiser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></svg></button>
-        </div>
-        <div class="pad" style="padding-top:0;padding-bottom:90px" id="cal-body"></div>
+        <div class="pad" style="padding-top:4px;padding-bottom:96px" id="cal-body"></div>
       </div>
-      <button class="fab hidden" id="btn-cal-add" aria-label="Ajouter un événement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="fab" id="btn-cal-add" aria-label="Ajouter un événement"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     </section>
 
     <!-- Photos -->
@@ -393,7 +404,6 @@ const DEMO = new URLSearchParams(location.search).has("demo");
 const CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "COLLE_ICI";
 // Clé publique « Web Push » (Firebase → Paramètres → Cloud Messaging → Certificats Web Push)
 const VAPID_KEY = "BN5rwv1dRVHcRpGspHgSLwd3lmnquJIe6SEiWHC67-qE9vxRUxAgrW6DfIrYAud5_6QeSonZwewacWYmWqCHDmw";
-const CAL_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
 const AUTO_LOCK_MS = 3 * 60e3;   // verrouillage après 3 min en arrière-plan
 const MAX_PIN_FAILS = 5;
 
@@ -606,31 +616,11 @@ async function firebaseBackend() {
     }
     return out;
   };
-  let redirectToken = null, messaging = null;
-  try {
-    const rr = await A.getRedirectResult(auth);
-    const c = rr && A.GoogleAuthProvider.credentialFromResult(rr);
-    if (c?.accessToken && rr.operationType === "reauthenticate") redirectToken = c.accessToken;
-  } catch (e) { console.warn(e); }
+  let messaging = null;
+  try { await A.getRedirectResult(auth); } catch (e) { console.warn(e); }
   const M = () => import(FB + "firebase-messaging.js");
 
   return {
-    takeRedirectToken() { const t = redirectToken; redirectToken = null; return t; },
-    async googleToken(email) {
-      const p = new A.GoogleAuthProvider();
-      p.addScope(CAL_SCOPE);
-      p.setCustomParameters({ login_hint: email });
-      try {
-        const r = await A.reauthenticateWithPopup(auth.currentUser, p);
-        return A.GoogleAuthProvider.credentialFromResult(r)?.accessToken || null;
-      } catch (e) {
-        if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment"].includes(e.code)) {
-          await A.reauthenticateWithRedirect(auth.currentUser, p);
-          return null;
-        }
-        throw e;
-      }
-    },
     async messagingToken(vapidKey, reg) {
       const m = await M();
       if (!(await m.isSupported())) throw Object.assign(new Error("Notifications non prises en charge"), { code: "unsupported" });
@@ -714,8 +704,6 @@ function demoBackend() {
     demo: true,
     signIn() {}, signOut() { location.href = location.pathname + "?demo"; },
     onUser(cb) { setTimeout(() => cb({ uid: "moi", displayName: "Toi", photoURL: "", email: "toi@demo.ca" })); return () => {}; },
-    takeRedirectToken: () => null,
-    async googleToken() { return "demo"; },
     async messagingToken() { throw Object.assign(new Error("Pas disponible en démo"), { code: "unsupported" }); },
     async deleteMessagingToken() {},
     arrayUnion: (...v) => v,
@@ -737,7 +725,7 @@ function demoBackend() {
 /* ============================================================
    État et écrans
    ============================================================ */
-const S = { me: null, meta: null, users: {}, messages: [], lists: [], items: [], photos: [], photosById: new Map(), photosLoaded: false,
+const S = { me: null, meta: null, users: {}, messages: [], events: [], lists: [], items: [], photos: [], photosById: new Map(), photosLoaded: false,
   view: "chat", openList: null, openListAt: 0, viewer: null };
 let be, unsubs = [];
 const CONTENT = ["messages", "lists", "items", "photos", "photosFull"];
@@ -981,9 +969,8 @@ function lockState() {
   thumbCache.clear();
   Object.assign(S, { messages: [], lists: [], items: [], photos: [], photosById: new Map(), photosLoaded: false });
   ["#msgs", "#grid", "#list-cards", "#items-todo", "#items-done", "#cal-body"].forEach((s) => $(s).replaceChildren());
-  Object.assign(Cal, { state: "idle", events: [], id: null, loadedAt: 0 });
+  S.events = []; msgSeen = null;
   closeSheetNow();
-  presence(false);
   $("#msgs").dataset.ready = "";
   if (S.openList) closeListNow();
 }
@@ -992,9 +979,8 @@ $("#btn-lock").onclick = lock;
 
 let hiddenAt = 0;
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) { hiddenAt = Date.now(); if (KEY) presence(false); }
+  if (document.hidden) hiddenAt = Date.now();
   else if (KEY && hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS) lock();
-  else if (KEY) presence(true);
 });
 
 const seqs = {};
@@ -1023,7 +1009,8 @@ function startApp() {
   stopWatchers();
   unsubs.push(
     be.watch("users", {}, (d) => { S.users = Object.fromEntries(d.map((x) => [x.id, x])); renderHeader(); renderChat(); renderNotifBanner(); }, onErr),
-    watchDec("messages", { orderBy: ["createdAt", "desc"], limit: 300 }, decMessage, (d) => { S.messages = d.reverse(); renderChat(); onNewMessages(); }),
+    watchDec("messages", { orderBy: ["createdAt", "desc"], limit: 300 }, decMessage, (d) => { S.messages = d.reverse(); renderChat(); onNewMessages(); bingIfNew(); }),
+    watchDec("events", { orderBy: ["createdAt", "asc"] }, decEvent, (d) => { S.events = d; renderCal(); }),
     watchDec("lists", { orderBy: ["createdAt", "asc"] }, decList, (d) => { S.lists = d; renderLists(); }),
     watchDec("items", { orderBy: ["createdAt", "asc"] }, decItem, (d) => { S.items = d; renderLists(); }),
     watchDec("photos", { orderBy: ["createdAt", "desc"] }, decPhoto, (d) => {
@@ -1034,10 +1021,6 @@ function startApp() {
   renderHeader();
   renderSendBtn();
   setTab(S.view);
-  presence(true);
-  if (S.me.email) encJ({ email: S.me.email }).then((em) => be.set("users", S.me.uid, { em }, true)).catch(() => {});
-  const rt = be.takeRedirectToken?.();
-  if (rt) { setGToken(rt); setTab("cal"); }
   renderNotifBanner();
   refreshNotifToken();
 }
@@ -1058,7 +1041,7 @@ async function signOut() {
   if (S.me) {
     const t = lsGet("fcm");
     if (t) { await be.set("users", S.me.uid, { fcm: be.arrayRemove(t) }, true).catch(() => {}); be.deleteMessagingToken?.().catch(() => {}); }
-    ["key", "fails", "fcm", "gtok"].forEach(lsDel);
+    ["key", "fails", "fcm"].forEach(lsDel);
   }
   lockState();
   be?.signOut();
@@ -1087,7 +1070,7 @@ function setTab(tab) {
   $$("nav.tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
   $$(".view").forEach((v) => v.classList.toggle("on", v.id === "v-" + tab));
   if (tab === "chat") { const m = $("#msgs"); m.scrollTop = m.scrollHeight; markSeen(); }
-  if (tab === "cal") loadCalendar();
+  if (tab === "cal") renderCal();
 }
 $$("nav.tabs button").forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
 document.addEventListener("focusin", (e) => { if (e.target.matches("textarea:not(.phrase),input.txt")) document.body.classList.add("typing"); });
@@ -1098,6 +1081,15 @@ document.addEventListener("focusout", () => setTimeout(() => {
 /* ============================================================
    Jasette
    ============================================================ */
+let msgSeen = null; // ids déjà vus (null = premier chargement)
+function bingIfNew() {
+  const ids = new Set(S.messages.map((m) => m.id));
+  if (msgSeen) {
+    const fresh = S.messages.some((m) => !msgSeen.has(m.id) && m.by !== S.me.uid && Date.now() - (+m.createdAt || 0) < 60e3);
+    if (fresh && !document.hidden) bing();
+  }
+  msgSeen = ids;
+}
 function renderChat() {
   if (!S.me || !KEY) return;
   const box = $("#msgs");
@@ -1433,8 +1425,7 @@ function openSettings() {
     menuRow("🔔", on ? "Désactiver les notifications" : "Activer les notifications",
       on ? "Activées sur cet appareil" : "Être averti quand " + partnerName() + " t'écrit",
       async () => { closeSheet(); on ? await disableNotifs() : await enableNotifs(); }),
-    menuRow("📅", "Google Agenda", getGToken() ? "Connecté" : "Non connecté sur cet appareil",
-      () => { closeSheet(); setTab("cal"); }),
+    menuRow("🧪", "Tester les notifications", "Envoie une notification de test sur tes appareils", () => { closeSheet(); testNotifs(); }),
     menuRow("🔒", "Verrouiller maintenant", "Il faudra entrer ton NIP", () => { closeSheetNow(); lock(); }),
     menuRow("👋", "Se déconnecter", S.me.email ? S.me.email + " · la phrase secrète sera oubliée sur cet appareil" : "",
       () => { if (confirm("Se déconnecter? Tu devras retaper la phrase secrète sur cet appareil.")) { closeSheetNow(); signOut(); } })));
@@ -1457,9 +1448,9 @@ $("#btn-notif-x").onclick = () => { lsSet("notif-x", 1); renderNotifBanner(); };
 async function enableNotifs() {
   if (DEMO) { toast("Pas disponible en démo"); return; }
   if (!VAPID_KEY) { toast("Les notifications ne sont pas encore configurées."); return; }
-  if (!notifSupported()) { toast("Installe l'app sur l'écran d'accueil pour recevoir des notifications."); return; }
+  if (!notifSupported()) { toast("Installe l'app sur l'écran d'accueil pour recevoir des notifications.", 4000); return; }
   const perm = await Notification.requestPermission();
-  if (perm !== "granted") { toast("Notifications refusées. Tu peux les permettre dans les réglages du navigateur."); renderNotifBanner(); return; }
+  if (perm !== "granted") { toast("Notifications refusées. Tu peux les permettre dans les réglages du navigateur.", 4000); renderNotifBanner(); return; }
   try {
     toast("Activation…", 0);
     const reg = await navigator.serviceWorker.register("sw.js");
@@ -1470,7 +1461,7 @@ async function enableNotifs() {
     toast("Notifications activées 🔔");
   } catch (e) {
     console.error(e);
-    toast("Impossible d'activer les notifications : " + (e.message || e), 5000);
+    toast("Impossible d'activer les notifications : " + (e.message || e), 6000);
   }
   renderNotifBanner();
 }
@@ -1490,253 +1481,178 @@ async function refreshNotifToken() {
     const reg = await navigator.serviceWorker.ready;
     const token = await be.messagingToken(VAPID_KEY, reg);
     const old = lsGet("fcm");
-    if (token && token !== old) {
-      await be.set("users", S.me.uid, { fcm: be.arrayUnion(token) }, true);
-      if (old) await be.set("users", S.me.uid, { fcm: be.arrayRemove(old) }, true).catch(() => {});
-      lsSet("fcm", token);
-    }
+    if (token) await be.set("users", S.me.uid, { fcm: be.arrayUnion(token) }, true);
+    if (token && old && token !== old) await be.set("users", S.me.uid, { fcm: be.arrayRemove(old) }, true).catch(() => {});
+    if (token) lsSet("fcm", token);
   } catch (e) { console.warn(e); }
 }
 
-/* Présence : pas de notification quand l'autre a l'app ouverte */
-let presTimer = null;
-function presence(on) {
-  clearInterval(presTimer); presTimer = null;
-  if (!S.me || DEMO) return;
-  if (on) {
-    const ping = () => be.set("users", S.me.uid, { present: be.ts() }, true).catch(() => {});
-    ping();
-    presTimer = setInterval(ping, 45e3);
-  } else {
-    be.set("users", S.me.uid, { present: null }, true).catch(() => {});
+/* Test : le serveur envoie une notification sur tes propres appareils et dit ce qui s'est passé */
+async function testNotifs() {
+  if (DEMO) { toast("Pas disponible en démo"); return; }
+  if (!notifOn()) {
+    toast("Active d'abord les notifications sur cet appareil.", 3000);
+    await enableNotifs();
+    if (!notifOn()) return;
   }
+  await refreshNotifToken();
+  toast("Test en cours…", 0);
+  const id = be.newId("pings");
+  try { await be.set("pings", id, { by: S.me.uid, createdAt: be.ts() }); }
+  catch (e) { hideToast(); onErr(e); return; }
+  const t0 = Date.now();
+  while (Date.now() - t0 < 30e3) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const p = await be.get("pings", id, true).catch(() => null);
+    if (p?.done) {
+      be.remove("pings", id).catch(() => {});
+      if (!p.total) toast("Le serveur ne trouve aucun appareil enregistré. Désactive puis réactive les notifications.", 7000);
+      else if (p.sent) toast(`✅ Envoyé à ${p.sent} appareil${p.sent > 1 ? "s" : ""}. Si rien n'apparaît, vérifie que Chrome a le droit d'afficher des notifications dans les réglages Android.`, 9000);
+      else toast("Le serveur a essayé mais l'envoi a échoué : " + (p.errors || []).join(", "), 9000);
+      return;
+    }
+  }
+  be.remove("pings", id).catch(() => {});
+  toast("❌ Le serveur de notifications ne répond pas : il n'est pas encore installé (vérifie l'onglet Actions sur GitHub).", 9000);
+}
+
+/* Petit « bing » quand l'app est ouverte et que l'autre écrit */
+let audioCtx = null;
+document.addEventListener("pointerdown", () => {
+  try { audioCtx ??= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume?.(); } catch {}
+}, { passive: true });
+function bing() {
+  navigator.vibrate?.(60);
+  if (!audioCtx) return;
+  try {
+    const t = audioCtx.currentTime;
+    [988, 1319].forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      const s = t + i * 0.13;
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.22, s + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + 0.45);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(s); o.stop(s + 0.5);
+    });
+  } catch {}
 }
 
 /* ============================================================
-   Agenda : un agenda Google « Nous deux » partagé entre vous deux
-   (stocké chez Google, visible aussi dans l'app Google Agenda)
+   Agenda : directement dans l'app, chiffré comme le reste
    ============================================================ */
-const CAL_API = "https://www.googleapis.com/calendar/v3";
-const Cal = { state: "idle", id: null, owner: null, shared: [], events: [], err: "", loadedAt: 0 };
-function getGToken() { const r = lsGet("gtok"); return r && r.exp > Date.now() + 60e3 ? r.t : null; }
-function setGToken(t) { lsSet("gtok", { t, exp: Date.now() + 55 * 60e3 }); }
-const needAuth = () => Object.assign(new Error("need-auth"), { code: "need-auth" });
-
-async function gcal(method, path, { body, query } = {}) {
-  if (DEMO) return demoCal(method, path, body);
-  const t = getGToken();
-  if (!t) throw needAuth();
-  const url = CAL_API + path + (query ? "?" + new URLSearchParams(query) : "");
-  const r = await fetch(url, {
-    method,
-    headers: { Authorization: "Bearer " + t, ...(body ? { "Content-Type": "application/json" } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (r.status === 401) { lsDel("gtok"); throw needAuth(); }
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    const reason = j.error?.errors?.[0]?.reason || j.error?.status || "";
-    const msg = j.error?.message || "Erreur " + r.status;
-    const e = new Error(/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(reason + " " + msg)
-      ? "L'API Google Agenda n'est pas encore activée pour votre projet. Elle s'activera avec le déploiement des notifications."
-      : msg);
-    e.status = r.status; e.reason = reason;
-    throw e;
-  }
-  return r.status === 204 ? null : r.json().catch(() => null);
-}
-
-async function connectCalendar() {
-  try {
-    const t = await be.googleToken(S.me.email);
-    if (t) { setGToken(t); await loadCalendar(true); }
-  } catch (e) {
-    if (["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(e.code)) return;
-    if (e.code === "auth/user-mismatch") { toast("Choisis le compte " + S.me.email, 4000); return; }
-    toast("Connexion à Google Agenda impossible : " + (e.message || e), 5000);
-  }
-}
-
-async function readCalMeta() {
-  const m = await be.get("meta", "calendar", true);
-  if (!m?.e) return null;
-  return { ...(await decJ(m.e)), owner: m.owner };
-}
-async function partnerEmail() {
-  const p = partner();
-  if (!p?.em) return null;
-  try { return (await decJ(p.em)).email || null; } catch { return null; }
-}
-
-async function loadCalendar(force) {
-  if (!KEY || Cal.state === "loading") return;
-  if (!force && Cal.state === "ready" && Date.now() - Cal.loadedAt < 60e3) { renderCal(); return; }
-  if (!DEMO && !getGToken()) { Cal.state = "auth"; renderCal(); return; }
-  Cal.state = "loading"; renderCal();
-  try {
-    const meta = await readCalMeta();
-    if (!meta) { Cal.state = "create"; renderCal(); return; }
-    Object.assign(Cal, { id: meta.id, owner: meta.owner, shared: meta.shared || [] });
-    // l'agenda doit apparaître dans le Google Agenda de cette personne
-    try { await gcal("GET", `/users/me/calendarList/${encodeURIComponent(Cal.id)}`); }
-    catch (e) {
-      if (e.code === "need-auth") throw e;
-      try { await gcal("POST", "/users/me/calendarList", { body: { id: Cal.id } }); }
-      catch (e2) { if (e2.code === "need-auth") throw e2; console.warn(e2); Cal.state = "waiting"; renderCal(); return; }
-    }
-    if (Cal.owner === S.me.uid) await ensureShared();
-    await fetchEvents();
-    Cal.state = "ready"; Cal.loadedAt = Date.now();
-  } catch (e) {
-    if (e.code === "need-auth") Cal.state = "auth";
-    else { Cal.state = "error"; Cal.err = e.message || String(e); console.error(e); }
-  }
-  renderCal();
-}
-
-async function ensureShared() {
-  const em = await partnerEmail();
-  if (!em || Cal.shared.includes(em)) return;
-  try {
-    await gcal("POST", `/calendars/${encodeURIComponent(Cal.id)}/acl`, {
-      query: { sendNotifications: "false" },
-      body: { role: "writer", scope: { type: "user", value: em } },
-    });
-    Cal.shared = [...Cal.shared, em];
-    await be.set("meta", "calendar", { e: await encJ({ id: Cal.id, shared: Cal.shared }), owner: Cal.owner });
-  } catch (e) { if (e.code === "need-auth") throw e; console.warn("Partage de l'agenda", e); }
-}
-
-async function createCalendar() {
-  Cal.state = "loading"; renderCal();
-  try {
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Toronto";
-    const c = await gcal("POST", "/calendars", { body: { summary: "Nous deux ❤️", description: "Agenda partagé de l'app Nous deux", timeZone } });
-    const ok = await be.createIfAbsent("meta", "calendar", { e: await encJ({ id: c.id, shared: [] }), owner: S.me.uid });
-    if (!ok) await gcal("DELETE", `/calendars/${encodeURIComponent(c.id)}`).catch(() => {}); // l'autre l'a créé en même temps
-    Cal.state = "idle";
-    await loadCalendar(true);
-    if (ok) toast("Agenda « Nous deux » créé 📅");
-  } catch (e) {
-    if (e.code === "need-auth") Cal.state = "auth";
-    else { Cal.state = "error"; Cal.err = e.message || String(e); }
-    renderCal();
-  }
-}
-
 const pad2 = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const hm = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 const localDate = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const atTime = (date, time) => { const d = localDate(date); const [h, m] = (time || "00:00").split(":").map(Number); d.setHours(h, m); return d; };
 
-function parseEvent(e) {
-  const allDay = !!e.start?.date;
-  return {
-    id: e.id, title: e.summary || "(Sans titre)", location: e.location || "", notes: e.description || "",
-    allDay,
-    start: allDay ? localDate(e.start.date) : new Date(e.start.dateTime),
-    end: allDay ? localDate(e.end.date) : new Date(e.end.dateTime),
-    link: e.htmlLink || "", creator: e.creator?.email || "",
-  };
+const Cal = { month: null, sel: null };
+async function decEvent(d) {
+  if (!d.e) return null;
+  const x = await decJ(d.e);
+  const allDay = !!x.allDay;
+  const endDate = x.endDate && x.endDate >= x.date ? x.endDate : x.date;
+  const start = allDay ? localDate(x.date) : atTime(x.date, x.start);
+  let end = allDay ? addDays(localDate(endDate), 1) : atTime(endDate, x.end || x.start);
+  if (!allDay && end <= start) end = new Date(start.getTime() + 60 * 60e3);
+  return { id: d.id, by: d.by, createdAt: d.createdAt, title: x.title || "(Sans titre)", location: x.location || "", notes: x.notes || "",
+    allDay, date: x.date, endDate, startTime: x.start || "", endTime: x.end || "", start, end };
 }
-async function fetchEvents() {
-  const from = addDays(startOfDay(new Date()), -1);
-  const r = await gcal("GET", `/calendars/${encodeURIComponent(Cal.id)}/events`, {
-    query: { singleEvents: "true", orderBy: "startTime", timeMin: from.toISOString(), timeMax: addDays(from, 366).toISOString(), maxResults: "250" },
-  });
-  Cal.events = (r?.items || []).filter((e) => e.status !== "cancelled").map(parseEvent)
-    .sort((a, b) => a.start - b.start);
+// jours (yyyy-mm-dd) touchés par un événement
+function eventDays(e) {
+  const out = [];
+  const last = e.allDay ? addDays(e.end, -1) : new Date(e.end.getTime() - 1);
+  for (let d = startOfDay(e.start); d <= last && out.length < 62; d = addDays(d, 1)) out.push(ymd(d));
+  return out.length ? out : [ymd(e.start)];
+}
+function eventsByDay() {
+  const m = new Map();
+  for (const e of S.events) for (const k of eventDays(e)) { if (!m.has(k)) m.set(k, []); m.get(k).push(e); }
+  for (const list of m.values()) list.sort((a, b) => (b.allDay - a.allDay) || (a.start - b.start));
+  return m;
 }
 
 function calDayLabel(d) {
   const diff = Math.round((startOfDay(d) - startOfDay(new Date())) / 864e5);
   if (diff === 0) return "Aujourd'hui";
   if (diff === 1) return "Demain";
+  if (diff === -1) return "Hier";
   const o = { weekday: "long", day: "numeric", month: "long" };
   if (d.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
   return d.toLocaleDateString("fr-CA", o);
 }
 const shortDate = (d) => d.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
 function evTime(e) {
-  if (e.allDay) {
-    const last = addDays(e.end, -1);
-    return ymd(last) > ymd(e.start) ? `Jusqu'au ${shortDate(last)}` : "Toute la journée";
-  }
+  if (e.allDay) return e.endDate > e.date ? `Du ${shortDate(localDate(e.date))} au ${shortDate(localDate(e.endDate))}` : "Toute la journée";
   return ymd(e.end) === ymd(e.start) ? `${fmtTime(e.start)} – ${fmtTime(e.end)}` : `${fmtTime(e.start)} → ${shortDate(e.end)} ${fmtTime(e.end)}`;
 }
-const whoMade = (e) => !e.creator || e.creator === S.me.email ? "toi" : partnerName();
+const whoMade = (e) => e.by === S.me.uid ? "toi" : partnerName();
+
+function evCard(e, withDate) {
+  return h("button", { class: "ev", onclick: () => openEvent(e) },
+    h("span", { class: "bar2" + (e.by === S.me.uid ? "" : " them") }),
+    h("span", { class: "grow" },
+      h("div", { class: "t", text: (withDate ? calDayLabel(e.start) + " · " : "") + evTime(e) }),
+      h("div", { class: "ttl", text: e.title }),
+      e.location ? h("div", { class: "loc", text: "📍 " + e.location }) : null));
+}
 
 function renderCal() {
-  const body = $("#cal-body");
   if (!S.me || !KEY) return;
-  $("#btn-cal-add").classList.toggle("hidden", Cal.state !== "ready");
-  $("#btn-cal-refresh").classList.toggle("hidden", Cal.state !== "ready");
-  $("#cal-sub").textContent = Cal.state === "ready" ? "Agenda « Nous deux »" : "";
-  const card = (emoji, title, text, ...btns) => h("div", { class: "empty" },
-    h("div", { class: "big", text: emoji }),
-    h("p", { style: "font-weight:800;color:var(--text);font-size:18px;margin-bottom:6px", text: title }),
-    h("p", { text }),
-    btns.length ? h("div", { class: "rowbtns", style: "margin-top:16px" }, ...btns) : null);
-  const ownerName = Cal.owner && S.users[Cal.owner]?.name || partnerName();
-  switch (Cal.state) {
-    case "auth":
-      body.replaceChildren(card("📅", "Google Agenda",
-        "Connecte ton compte Google pour voir et ajouter vos événements communs. Ils apparaîtront aussi dans vos apps Google Agenda, avec leurs rappels.",
-        h("button", { class: "btn", text: "Connecter Google Agenda", onclick: connectCalendar })));
-      break;
-    case "create":
-      body.replaceChildren(card("📅", "Créer votre agenda",
-        `Un agenda « Nous deux » sera créé dans ton Google Agenda et partagé avec ${partnerName()}.`,
-        h("button", { class: "btn", text: "Créer l'agenda", onclick: createCalendar })));
-      break;
-    case "waiting":
-      body.replaceChildren(card("⏳", "Presque!",
-        `${ownerName} doit ouvrir l'onglet Agenda une fois pour te donner accès à l'agenda. Réessaie ensuite.`,
-        h("button", { class: "btn ghost", text: "Réessayer", onclick: () => loadCalendar(true) })));
-      break;
-    case "error":
-      body.replaceChildren(card("😕", "Oups", Cal.err,
-        h("button", { class: "btn ghost", text: "Réessayer", onclick: () => loadCalendar(true) }),
-        h("button", { class: "btn ghost", text: "Reconnecter", onclick: () => { lsDel("gtok"); connectCalendar(); } })));
-      break;
-    case "ready": renderEvents(body); break;
-    default: body.replaceChildren(h("div", { class: "spin", style: "margin-top:60px" }));
-  }
-}
-
-function renderEvents(body) {
   const today = startOfDay(new Date());
-  const evs = Cal.events.filter((e) => e.end > today);
-  if (!evs.length) {
-    body.replaceChildren(h("div", { class: "empty" }, h("div", { class: "big", text: "🗓️" }),
-      h("p", { text: "Rien de prévu pour l'instant. Ajoutez votre prochain rendez-vous avec le bouton +." })));
-    return;
-  }
-  const groups = new Map();
-  for (const e of evs) {
-    const d = e.start < today ? today : startOfDay(e.start);
+  Cal.month ??= new Date(today.getFullYear(), today.getMonth(), 1);
+  Cal.sel ??= today;
+  const m = Cal.month;
+  const byDay = eventsByDay();
+  const first = new Date(m.getFullYear(), m.getMonth(), 1);
+  const gridStart = addDays(first, -((first.getDay() + 6) % 7)); // semaine commence lundi
+  const lastOfMonth = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+  const weeks = Math.ceil((((first.getDay() + 6) % 7) + lastOfMonth.getDate()) / 7);
+  const cells = [];
+  for (let i = 0; i < weeks * 7; i++) {
+    const d = addDays(gridStart, i);
     const k = ymd(d);
-    if (!groups.has(k)) groups.set(k, { date: d, list: [] });
-    groups.get(k).list.push(e);
+    const evs = byDay.get(k) || [];
+    const cls = ["dcell", d.getMonth() !== m.getMonth() ? "out" : "", k === ymd(today) ? "today" : "", k === ymd(Cal.sel) ? "sel" : ""].filter(Boolean).join(" ");
+    cells.push(h("button", { class: cls, "aria-label": calDayLabel(d) + (evs.length ? `, ${evs.length} événement${evs.length > 1 ? "s" : ""}` : ""),
+      onclick: () => { Cal.sel = d; if (d.getMonth() !== m.getMonth()) Cal.month = new Date(d.getFullYear(), d.getMonth(), 1); renderCal(); } },
+      h("span", { text: d.getDate() }),
+      h("span", { class: "dd" }, ...evs.slice(0, 3).map((e) => h("i", { class: e.by === S.me.uid ? "" : "them" })))));
   }
-  const out = [];
-  for (const g of groups.values()) {
-    out.push(h("div", { class: "evday", text: calDayLabel(g.date) }));
-    for (const e of g.list) {
-      out.push(h("button", { class: "ev", onclick: () => openEvent(e) },
-        h("span", { class: "bar2" + (whoMade(e) === "toi" ? "" : " them") }),
-        h("span", { class: "grow" },
-          h("div", { class: "t", text: evTime(e) }),
-          h("div", { class: "ttl", text: e.title }),
-          e.location ? h("div", { class: "loc", text: "📍 " + e.location }) : null)));
-    }
-  }
-  body.replaceChildren(...out);
+  const title = m.toLocaleDateString("fr-CA", { month: "long", year: "numeric" });
+  const selEvents = byDay.get(ymd(Cal.sel)) || [];
+  const upcoming = S.events.filter((e) => e.end > today && ymd(e.start) !== ymd(Cal.sel)).sort((a, b) => a.start - b.start).slice(0, 5);
+  $("#cal-body").replaceChildren(
+    h("div", { class: "calhead" },
+      h("button", { class: "plain", "aria-label": "Mois précédent", onclick: () => { Cal.month = new Date(m.getFullYear(), m.getMonth() - 1, 1); renderCal(); } },
+        svg('<path d="M15 5l-7 7 7 7"/>')),
+      h("h2", { text: title }),
+      h("button", { class: "plain", "aria-label": "Mois suivant", onclick: () => { Cal.month = new Date(m.getFullYear(), m.getMonth() + 1, 1); renderCal(); } },
+        svg('<path d="M9 5l7 7-7 7"/>')),
+      h("button", { class: "btn ghost small", text: "Aujourd'hui", onclick: () => { Cal.sel = today; Cal.month = new Date(today.getFullYear(), today.getMonth(), 1); renderCal(); } })),
+    h("div", { class: "wk" }, ..."LMMJVSD".split("").map((c) => h("span", { text: c }))),
+    h("div", { class: "mgrid" }, ...cells),
+    h("div", { class: "evday", text: calDayLabel(Cal.sel) }),
+    ...(selEvents.length ? selEvents.map((e) => evCard(e)) : [h("button", { class: "ev empty-ev", onclick: () => eventForm(null) },
+      h("span", { class: "grow" }, h("div", { class: "t", text: "Rien de prévu" }), h("div", { class: "ttl", text: "＋ Ajouter un événement" })))]),
+    upcoming.length ? h("div", { class: "evday", text: "Prochains événements" }) : null,
+    ...upcoming.map((e) => evCard(e, true)),
+  );
 }
-$("#btn-cal-refresh").onclick = () => loadCalendar(true);
 $("#btn-cal-add").onclick = () => eventForm(null);
+
+function googleLink(e) {
+  const f = (d) => `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`;
+  const ft = (d) => `${f(d)}T${pad2(d.getHours())}${pad2(d.getMinutes())}00`;
+  const dates = e.allDay ? `${f(e.start)}/${f(e.end)}` : `${ft(e.start)}/${ft(e.end)}`;
+  const q = new URLSearchParams({ action: "TEMPLATE", text: e.title, dates, details: e.notes, location: e.location,
+    ctz: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Toronto" });
+  return "https://calendar.google.com/calendar/render?" + q;
+}
 
 function openEvent(e) {
   const rows = [
@@ -1744,28 +1660,23 @@ function openEvent(e) {
     e.location ? h("div", {}, h("div", { class: "k", text: "Où" }), h("div", { text: e.location })) : null,
     e.notes ? h("div", {}, h("div", { class: "k", text: "Notes" }), h("div", { style: "white-space:pre-wrap", text: e.notes })) : null,
     h("div", {}, h("div", { class: "k", text: "Ajouté par" }), h("div", { text: whoMade(e) })),
-    e.link ? h("a", { href: e.link, target: "_blank", rel: "noopener", text: "Ouvrir dans Google Agenda ↗" }) : null,
+    h("a", { href: googleLink(e), target: "_blank", rel: "noopener", text: "Copier dans mon Google Agenda ↗" }),
   ];
   openSheet(e.title, h("div", { class: "detail" }, ...rows), [
-    h("button", { class: "btn danger small", text: "Supprimer", onclick: async () => {
+    h("button", { class: "btn danger small", text: "Supprimer", onclick: () => {
       if (!confirm(`Supprimer « ${e.title} » pour vous deux?`)) return;
       closeSheet();
-      try { await gcal("DELETE", `/calendars/${encodeURIComponent(Cal.id)}/events/${encodeURIComponent(e.id)}`); toast("Événement supprimé"); }
-      catch (err) { calErr(err); }
-      loadCalendar(true);
+      be.remove("events", e.id).then(() => toast("Événement supprimé")).catch(onErr);
     } }),
     h("button", { class: "btn small", text: "Modifier", onclick: () => eventForm(e) }),
   ]);
 }
 
-function calErr(err) {
-  if (err.code === "need-auth") { Cal.state = "auth"; renderCal(); toast("Reconnecte Google Agenda"); }
-  else toast("Oups : " + (err.message || err), 5000);
-}
-
 function eventForm(ev) {
+  const sel = Cal.sel || startOfDay(new Date());
   const now = new Date();
-  const s0 = ev ? ev.start : new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
+  const defStart = ymd(sel) === ymd(now) ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1) : new Date(sel.getFullYear(), sel.getMonth(), sel.getDate(), 18);
+  const s0 = ev ? ev.start : defStart;
   const e0 = ev ? ev.end : new Date(s0.getTime() + 60 * 60e3);
   const f = {
     title: h("input", { class: "txt", maxlength: "200", placeholder: "Souper chez ta mère, dentiste…" }),
@@ -1779,10 +1690,10 @@ function eventForm(ev) {
   };
   f.title.value = ev?.title || "";
   f.allDay.checked = !!ev?.allDay;
-  f.date.value = ymd(s0);
-  f.endDate.value = ev?.allDay ? ymd(addDays(e0, -1)) : ymd(s0);
-  f.start.value = hm(s0);
-  f.end.value = hm(e0);
+  f.date.value = ev ? ev.date : ymd(s0);
+  f.endDate.value = ev ? ev.endDate : ymd(s0);
+  f.start.value = ev && !ev.allDay ? ev.startTime : hm(s0);
+  f.end.value = ev && !ev.allDay ? ev.endTime : hm(e0);
   f.loc.value = ev?.location || "";
   f.notes.value = ev?.notes || "";
   const times = h("div", { class: "two" },
@@ -1791,12 +1702,16 @@ function eventForm(ev) {
   const endDay = h("label", { class: "field" }, "Jusqu'au (inclus)", f.endDate);
   const sync = () => { times.classList.toggle("hidden", f.allDay.checked); endDay.classList.toggle("hidden", !f.allDay.checked); };
   f.allDay.onchange = sync;
-  f.date.onchange = () => { if (f.endDate.value < f.date.value) f.endDate.value = f.date.value; };
+  f.date.onchange = () => { if (!f.endDate.value || f.endDate.value < f.date.value) f.endDate.value = f.date.value; };
+  let dur = Math.max(15, Math.round((e0 - s0) / 60e3) || 60);
+  f.end.onchange = () => {
+    const [sh, sm] = f.start.value.split(":").map(Number), [eh, em] = f.end.value.split(":").map(Number);
+    const d = (eh * 60 + em) - (sh * 60 + sm);
+    if (d > 0) dur = d;
+  };
   f.start.onchange = () => { // garde la même durée
     const [sh, sm] = f.start.value.split(":").map(Number);
-    const dur = Math.max(30, (e0 - s0) / 60e3 || 60);
-    const t = new Date(2000, 0, 1, sh, sm + dur);
-    f.end.value = hm(t);
+    f.end.value = hm(new Date(2000, 0, 1, sh, sm + dur));
   };
   sync();
   const save = h("button", { class: "btn", text: ev ? "Enregistrer" : "Ajouter" });
@@ -1804,27 +1719,22 @@ function eventForm(ev) {
     const title = f.title.value.trim();
     if (!title) { f.title.focus(); toast("Donne un titre à l'événement"); return; }
     if (!f.date.value) { toast("Choisis une date"); return; }
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Toronto";
-    const body = { summary: title, location: f.loc.value.trim(), description: f.notes.value.trim() };
-    if (f.allDay.checked) {
-      const last = f.endDate.value && f.endDate.value >= f.date.value ? f.endDate.value : f.date.value;
-      body.start = { date: f.date.value };
-      body.end = { date: ymd(addDays(localDate(last), 1)) };
-    } else {
-      if (!f.start.value || !f.end.value) { toast("Choisis les heures"); return; }
-      const endDate = f.end.value <= f.start.value ? ymd(addDays(localDate(f.date.value), 1)) : f.date.value;
-      body.start = { dateTime: `${f.date.value}T${f.start.value}:00`, timeZone };
-      body.end = { dateTime: `${endDate}T${f.end.value}:00`, timeZone };
-    }
+    const allDay = f.allDay.checked;
+    if (!allDay && (!f.start.value || !f.end.value)) { toast("Choisis les heures"); return; }
+    let endDate = allDay ? (f.endDate.value && f.endDate.value >= f.date.value ? f.endDate.value : f.date.value) : f.date.value;
+    if (!allDay && f.end.value <= f.start.value) endDate = ymd(addDays(localDate(f.date.value), 1)); // finit après minuit
+    const data = { title, allDay, date: f.date.value, endDate, start: allDay ? "" : f.start.value, end: allDay ? "" : f.end.value,
+      location: f.loc.value.trim(), notes: f.notes.value.trim() };
     save.disabled = true;
     try {
-      const base = `/calendars/${encodeURIComponent(Cal.id)}/events`;
-      if (ev) await gcal("PUT", `${base}/${encodeURIComponent(ev.id)}`, { body });
-      else await gcal("POST", base, { body });
+      if (ev) await be.update("events", ev.id, { e: await encJ(data) });
+      else await be.set("events", be.newId("events"), { e: await encJ(data), by: S.me.uid, createdAt: be.ts() });
+      Cal.sel = localDate(data.date);
+      Cal.month = new Date(Cal.sel.getFullYear(), Cal.sel.getMonth(), 1);
       closeSheet();
       toast(ev ? "Événement modifié" : "Ajouté à votre agenda 📅");
-      loadCalendar(true);
-    } catch (err) { save.disabled = false; calErr(err); }
+      renderCal();
+    } catch (err) { save.disabled = false; onErr(err); }
   };
   openSheet(ev ? "Modifier l'événement" : "Nouvel événement", h("div", { style: "display:flex;flex-direction:column;gap:12px" },
     h("label", { class: "field" }, "Titre", f.title),
@@ -1834,35 +1744,6 @@ function eventForm(ev) {
     h("label", { class: "field" }, "Lieu", f.loc),
     h("label", { class: "field" }, "Notes", f.notes)), [save]);
   if (!ev) setTimeout(() => f.title.focus(), 250);
-}
-
-/* Agenda de démonstration (mode ?demo) */
-const demoCalStore = { cals: {}, list: new Set() };
-async function demoCal(method, path, body) {
-  await new Promise((r) => setTimeout(r, 120));
-  const notFound = () => Object.assign(new Error("Not Found"), { status: 404 });
-  let m;
-  if (method === "POST" && path === "/calendars") {
-    const id = "demo-" + Math.random().toString(36).slice(2, 8) + "@group.calendar.google.com";
-    demoCalStore.cals[id] = { ...body, id, events: [] };
-    demoCalStore.list.add(id);
-    return { id };
-  }
-  if ((m = path.match(/^\/users\/me\/calendarList\/(.+)$/))) { if (demoCalStore.list.has(decodeURIComponent(m[1]))) return {}; throw notFound(); }
-  if (path === "/users/me/calendarList" && method === "POST") { demoCalStore.list.add(body.id); return {}; }
-  if ((m = path.match(/^\/calendars\/([^/]+)\/acl$/))) return {};
-  if ((m = path.match(/^\/calendars\/([^/]+)$/)) && method === "DELETE") { delete demoCalStore.cals[decodeURIComponent(m[1])]; return null; }
-  if ((m = path.match(/^\/calendars\/([^/]+)\/events(?:\/(.+))?$/))) {
-    const cal = demoCalStore.cals[decodeURIComponent(m[1])];
-    if (!cal) throw notFound();
-    const eid = m[2] && decodeURIComponent(m[2]);
-    const stamp = (x) => ({ ...x, start: { ...x.start, dateTime: x.start.dateTime && new Date(x.start.dateTime).toISOString() }, end: { ...x.end, dateTime: x.end.dateTime && new Date(x.end.dateTime).toISOString() } });
-    if (method === "GET") return { items: cal.events.map(stamp) };
-    if (method === "POST") { const e = { ...body, id: "e" + Math.random().toString(36).slice(2, 8), creator: { email: S.me.email }, htmlLink: "https://calendar.google.com/" }; cal.events.push(e); return e; }
-    if (method === "PUT") { const i = cal.events.findIndex((x) => x.id === eid); cal.events[i] = { ...cal.events[i], ...body }; return cal.events[i]; }
-    if (method === "DELETE") { cal.events = cal.events.filter((x) => x.id !== eid); return null; }
-  }
-  throw new Error("démo : " + method + " " + path);
 }
 
 /* Bouton « retour » d'Android */

@@ -106,7 +106,7 @@ exports.turnCredentials = onCall(async (req) => {
   return { iceServers, configured: true };
 });
 
-// Assistant IA (Claude) : relais vers l'API d'Anthropic.
+// Assistant IA (Claude) : relais vers l'API d'Anthropic (clé : secret GitHub ANTHROPIC_API_KEY).
 // L'app envoie seulement ce dont l'assistant a besoin (inventaire, épicerie, agenda à venir).
 // Les modifications sont appliquées par l'app elle-même, qui garde le chiffrement.
 const ASSISTANT_MODEL = process.env.ASSISTANT_MODEL || "claude-sonnet-5-5";

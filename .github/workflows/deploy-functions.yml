@@ -81,6 +81,8 @@ jobs:
           if [ -n "$CF_ID" ] && [ -n "$CF_TOKEN" ]; then
             printf 'CF_TURN_KEY_ID=%s\nCF_TURN_TOKEN=%s\n' "$CF_ID" "$CF_TOKEN" >> functions/.env
             echo "Relais d'appels Cloudflare : configuré"
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "https://rtc.live.cloudflare.com/v1/turn/keys/$CF_ID/credentials/generate-ice-servers" -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" --data '{"ttl":60}')
+            echo "Test Cloudflare (201 = OK) : $code"
           else
             echo "Relais d'appels Cloudflare : pas encore configuré"
           fi

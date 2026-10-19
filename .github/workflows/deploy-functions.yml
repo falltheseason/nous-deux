@@ -69,6 +69,7 @@ jobs:
         env:
           CF_ID: ${{ secrets.CF_TURN_KEY_ID }}
           CF_TOKEN: ${{ secrets.CF_TURN_TOKEN }}
+          AI_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           loc=$(gcloud firestore databases describe --database='(default)' --project "$PROJECT_ID" --format='value(locationId)')
           case "$loc" in
@@ -86,6 +87,7 @@ jobs:
           else
             echo "Relais d'appels Cloudflare : pas encore configuré"
           fi
+          if [ -n "$AI_KEY" ]; then printf 'ANTHROPIC_API_KEY=%s\n' "$AI_KEY" >> functions/.env; fi
 
       - name: Installer
         if: env.HAS_KEY == 'true'
@@ -103,8 +105,17 @@ jobs:
         env:
           CF_ID: ${{ secrets.CF_TURN_KEY_ID }}
           CF_TOKEN: ${{ secrets.CF_TURN_TOKEN }}
+          AI_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           {
+            echo "=== Assistant (clé Anthropic) ==="
+            if [ -n "$AI_KEY" ]; then
+              code=$(curl -s -o "$RUNNER_TEMP/models.json" -w "%{http_code}" https://api.anthropic.com/v1/models?limit=100 -H "x-api-key: $AI_KEY" -H "anthropic-version: 2023-06-01")
+              echo "HTTP $code"
+              grep -o '"id":"claude-sonnet-5-5[^"]*"' "$RUNNER_TEMP/models.json" | head -2 || echo "modèle claude-sonnet-5-5 introuvable dans la liste"
+            else
+              echo "Secret ANTHROPIC_API_KEY absent"
+            fi
             echo "=== Relais d'appels Cloudflare ==="
             if [ -n "$CF_ID" ] && [ -n "$CF_TOKEN" ]; then
               resp=$(curl -s -w "\nHTTP %{http_code}" -X POST "https://rtc.live.cloudflare.com/v1/turn/keys/$CF_ID/credentials/generate-ice-servers" -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" --data '{"ttl":60}')
@@ -116,7 +127,7 @@ jobs:
             echo "=== Fonctions installées ==="
             gcloud functions list --project "$PROJECT_ID" --format="table(name,state,environment,location)" 2>&1 || true
             echo "=== Base Firestore ==="
-            grep -v '^CF_TURN_TOKEN' functions/.env 2>/dev/null | sed 's/^CF_TURN_KEY_ID=.*/CF_TURN_KEY_ID=(présent)/' || true
+            grep -v '^CF_TURN_TOKEN\|^ANTHROPIC_API_KEY' functions/.env 2>/dev/null | sed 's/^CF_TURN_KEY_ID=.*/CF_TURN_KEY_ID=(présent)/' || true
             R=$(sed -n 's/^ND_REGION=//p' functions/.env)
             echo "=== Déclencheurs Eventarc ==="
             gcloud eventarc triggers list --location="$R" --project "$PROJECT_ID" 2>&1 || true
@@ -124,7 +135,7 @@ jobs:
             gcloud firestore databases describe --database='(default)' --project "$PROJECT_ID" --format="yaml(locationId,type,databaseEdition)" 2>&1 || true
             echo "=== Rôles du compte de calcul ==="
             gcloud projects get-iam-policy "$PROJECT_ID" --flatten="bindings[].members" --filter="bindings.members:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" --format="value(bindings.role)" 2>&1 || true
-            for f in turnCredentials notifierAppel testerNotification; do
+            for f in assistant turnCredentials notifierAppel; do
               echo "=== Journal $f ==="
               gcloud functions logs read "$f" --region="$R" --project "$PROJECT_ID" --limit=40 2>&1 || true
             done

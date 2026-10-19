@@ -317,6 +317,28 @@ textarea.txt{resize:vertical;min-height:70px;font:inherit}
 select.txt{appearance:auto}
 nav.tabs button{font-size:11px}
 
+/* Assistant */
+.assist{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;max-width:640px;margin:0 auto}
+.as-head{display:flex;align-items:center;gap:6px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;border-bottom:1px solid var(--line)}
+.as-title{flex:1;font-weight:800;font-size:19px}
+.as-log{flex:1;overflow-y:auto;padding:12px 12px 6px;display:flex;flex-direction:column;gap:8px}
+.as-row{display:flex}
+.as-row.me{justify-content:flex-end}
+.as-b{max-width:86%;padding:10px 14px;border-radius:18px;line-height:1.42;overflow-wrap:anywhere;white-space:pre-wrap}
+.as-row.me .as-b{background:var(--mine);color:var(--mine-ink);border-bottom-right-radius:6px}
+.as-row.ai .as-b{background:var(--theirs);color:var(--theirs-ink);border-bottom-left-radius:6px;box-shadow:var(--shadow);white-space:normal}
+.md p{margin:0 0 6px}.md p:last-child{margin-bottom:0}
+.md h4{font-size:16px;font-weight:800;margin:6px 0 4px}
+.md ul,.md ol{margin:2px 0 8px 20px;padding:0}
+.md li{margin:2px 0}
+.as-act{align-self:center;font-size:13px;font-weight:700;color:var(--muted);background:var(--surface2);border-radius:12px;padding:6px 12px;text-align:center;max-width:92%}
+.as-hello{text-align:center;color:var(--muted);padding:24px 18px;line-height:1.45}
+.as-hello .big{font-size:44px;margin-bottom:6px}
+.as-note{font-size:12.5px;margin-top:12px;background:var(--surface2);border-radius:12px;padding:8px 12px}
+.as-sugg{padding:4px 12px 0}
+#as-mic.live{background:#e5394b;color:#fff;animation:blink 1.2s infinite}
+.addrow #pan-search{flex:1;min-width:0}
+
 /* Toast */
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 84px);transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:999px;font-weight:700;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:30;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -447,7 +469,10 @@ nav.tabs button{font-size:11px}
     <section class="view" id="v-pantry">
       <div class="scroll">
         <div class="pad" style="padding-top:4px;padding-bottom:96px">
-          <input class="txt" id="pan-search" type="search" placeholder="🔎 Chercher (lait, poulet…)" autocomplete="off" style="width:100%">
+          <div class="addrow">
+            <input class="txt" id="pan-search" type="search" placeholder="🔎 Chercher (lait, poulet…)" autocomplete="off">
+            <button class="btn small" id="btn-assist" aria-label="Assistant">✨ Assistant</button>
+          </div>
           <div class="chips" id="pan-chips"></div>
           <div id="pan-list"></div>
         </div>
@@ -493,6 +518,22 @@ nav.tabs button{font-size:11px}
       Photos
     </button>
   </nav>
+</div>
+
+<!-- Assistant IA -->
+<div class="assist hidden" id="assist">
+  <div class="as-head">
+    <button class="plain" id="as-close" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="as-title">✨ Assistant</div>
+    <button class="link2" id="as-new">Nouvelle</button>
+  </div>
+  <div class="as-log" id="as-log"></div>
+  <div class="chips as-sugg" id="as-sugg"></div>
+  <form class="composer" id="as-form">
+    <button type="button" class="iconbtn" id="as-mic" aria-label="Dicter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+    <textarea id="as-input" rows="1" placeholder="Dicte ou écris…" enterkeyhint="send"></textarea>
+    <button type="submit" class="iconbtn send" aria-label="Envoyer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
+  </form>
 </div>
 
 <!-- Appel -->
@@ -776,10 +817,10 @@ async function firebaseBackend() {
     arrayUnion: (...v) => F.arrayUnion(...v),
     arrayRemove: (...v) => F.arrayRemove(...v),
     deleteField: () => F.deleteField(),
-    async callFn(name, data) {
+    async callFn(name, data, timeout = 10000) {
       const Fn = await import(FB + "firebase-functions.js");
       fns ??= Fn.getFunctions(app, FN_REGION);
-      return (await Fn.httpsCallable(fns, name, { timeout: 10000 })(data || {})).data;
+      return (await Fn.httpsCallable(fns, name, { timeout })(data || {})).data;
     },
     watchDoc: (col, id, cb) => F.onSnapshot(F.doc(db, col, id), (s) => cb(s.exists() ? conv(s) : null), (e) => console.warn(e)),
     async signIn() {
@@ -895,7 +936,16 @@ function demoBackend() {
     arrayUnion: (...v) => v,
     arrayRemove: () => [],
     deleteField: () => "__DEL__",
-    async callFn() { return { iceServers: [], configured: false }; },
+    async callFn(name, data) {
+      if (name !== "assistant") return { iceServers: [], configured: false };
+      await new Promise((r) => setTimeout(r, 300));
+      const last = data.messages.at(-1);
+      if (Array.isArray(last.content)) return { stop_reason: "end_turn", content: [{ type: "text", text: "C'est noté! J'ai ajouté **2 L de lait** et **12 œufs** au frigo, et **3 poitrines de poulet** au congélo." }] };
+      const t = String(last.content).toLowerCase();
+      if (/mange|recette|souper/.test(t)) return { stop_reason: "end_turn", content: [{ type: "text", text: "## Poulet au riz\n**30 min · 2 portions**\n\nIngrédients :\n- 2 poitrines de poulet\n- 1 tasse de riz\n\n1. Cuire le riz.\n2. Saisir le poulet." }] };
+      return { stop_reason: "tool_use", content: [{ type: "text", text: "Parfait, je m'en occupe." }, { type: "tool_use", id: "tu1", name: "add_pantry_items",
+        input: { items: [{ name: "Lait", qty: 2, unit: "L", loc: "frigo" }, { name: "Œufs", qty: 12, unit: "", loc: "frigo" }, { name: "Poitrines de poulet", qty: 3, unit: "", loc: "congelo" }] } }] };
+    },
     watch(c, opt, cb) { const s = { col: c, opt, cb }; subs.push(s); run(s); return () => subs.splice(subs.indexOf(s), 1); },
     watchDoc(c, id, cb) { const s = { col: c, id, cb }; docSubs.push(s); emit(c, id); return () => { const i = docSubs.indexOf(s); if (i >= 0) docSubs.splice(i, 1); }; },
     newId: () => nid(),
@@ -1249,6 +1299,7 @@ function lockState() {
   Object.assign(S, { messages: [], lists: [], items: [], photos: [], photosById: new Map(), photosLoaded: false });
   ["#msgs", "#grid", "#list-cards", "#items-todo", "#items-done", "#cal-body"].forEach((s) => $(s).replaceChildren());
   S.events = []; msgSeen = null; S.pantry = []; S.pantryLocs = null;
+  closeAssistantNow(); AS.msgs = []; AS.busy = false;
   $("#pan-list").replaceChildren();
   if (Call.id || Call.status) endCall();
   if (Rec.mr) stopRec(false);
@@ -2159,16 +2210,17 @@ async function changeQty(it, dir) {
 }
 
 /* Lien avec la liste d'épicerie */
-async function addToGrocery(name) {
-  let list = S.lists.find((l) => /[ée]picerie/i.test(l.title));
+let newGroceryList = null;
+async function addToGrocery(name, quiet) {
+  let list = S.lists.find((l) => /[ée]picerie/i.test(l.title)) || newGroceryList;
   if (!list) {
     const id = be.newId("lists");
+    list = newGroceryList = { id, title: "Épicerie" };
     await be.set("lists", id, { e: await encJ({ title: "Épicerie" }), by: S.me.uid, createdAt: be.ts() });
-    list = { id, title: "Épicerie" };
   }
   const exists = itemsOf(list.id).some((i) => !i.done && i.text.trim().toLowerCase() === name.trim().toLowerCase());
   if (!exists) await be.set("items", be.newId("items"), { listId: list.id, e: await encJ({ text: name }), done: false, by: S.me.uid, createdAt: be.ts() });
-  toast(exists ? `« ${name} » est déjà sur la liste « ${list.title} »` : `« ${name} » ajouté à la liste « ${list.title} » 🛒`);
+  if (!quiet) toast(exists ? `« ${name} » est déjà sur la liste « ${list.title} »` : `« ${name} » ajouté à la liste « ${list.title} » 🛒`);
 }
 
 function pantryForm(it) {
@@ -2255,6 +2307,270 @@ function manageLocs() {
 }
 $("#btn-pan-add").onclick = () => pantryForm(null);
 $("#pan-search").addEventListener("input", (e) => { Pan.q = e.target.value; renderPantry(); });
+
+/* ============================================================
+   Assistant IA (Claude)
+   Ce que tu lui dis + l'inventaire, l'épicerie et l'agenda à venir sont
+   envoyés à Claude (Anthropic) pour qu'il puisse t'aider. Les changements
+   sont faits ici, dans l'app, et restent chiffrés dans Firebase.
+   ============================================================ */
+const AS = { msgs: [], busy: false, rec: null };
+const AS_SUGG = [
+  ["🧊", "Faire l'inventaire du frigo"],
+  ["🍽️", "On mange quoi ce soir?"],
+  ["⏰", "Qu'est-ce qui expire bientôt?"],
+  ["🛒", "Qu'est-ce qui manque pour faire une lasagne?"],
+];
+const AS_TOOLS = [
+  { name: "add_pantry_items", description: "Ajoute des articles à l'inventaire. Si le même article (même nom, même endroit, même unité, même date) existe, les quantités s'additionnent.",
+    input_schema: { type: "object", required: ["items"], properties: { items: { type: "array", items: { type: "object", required: ["name", "qty", "loc"], properties: {
+      name: { type: "string", description: "Nom court, en français, première lettre majuscule (ex. « Lait 2 % »)" },
+      qty: { type: "number" }, unit: { type: "string", enum: UNITS },
+      loc: { type: "string", description: "id de l'emplacement" },
+      exp: { type: "string", description: "Date AAAA-MM-JJ, seulement si connue" }, note: { type: "string" } } } } } } },
+  { name: "update_pantry_item", description: "Modifie un article existant (par son id) : quantité, unité, emplacement, date, nom ou note. qty = 0 garde l'article à zéro.",
+    input_schema: { type: "object", required: ["id"], properties: { id: { type: "string" }, name: { type: "string" }, qty: { type: "number" }, unit: { type: "string", enum: UNITS }, loc: { type: "string" }, exp: { type: "string" }, note: { type: "string" } } } },
+  { name: "remove_pantry_items", description: "Retire complètement des articles de l'inventaire (par leurs id).",
+    input_schema: { type: "object", required: ["ids"], properties: { ids: { type: "array", items: { type: "string" } } } } },
+  { name: "add_to_grocery_list", description: "Ajoute des articles à la liste d'épicerie partagée.",
+    input_schema: { type: "object", required: ["items"], properties: { items: { type: "array", items: { type: "string" } } } } },
+  { name: "add_calendar_event", description: "Ajoute un événement à l'agenda partagé.",
+    input_schema: { type: "object", required: ["title", "date"], properties: { title: { type: "string" }, date: { type: "string", description: "AAAA-MM-JJ" },
+      start: { type: "string", description: "HH:MM (absent = toute la journée)" }, end: { type: "string", description: "HH:MM" }, location: { type: "string" }, notes: { type: "string" } } } },
+];
+
+function asSystem() {
+  const today = new Date();
+  const locs = pantryLocs();
+  const inv = (S.pantry || []).map((it) => `${it.id} | ${it.name} | ${it.qty} | ${it.unit || "unité"} | ${it.loc} | ${it.exp || "-"} | ${it.note || ""}`).join("\n") || "(vide)";
+  const g = S.lists.find((l) => /[ée]picerie/i.test(l.title));
+  const groc = g ? itemsOf(g.id).filter((i) => !i.done).map((i) => "- " + i.text).join("\n") || "(vide)" : "(pas de liste)";
+  const soon = (S.events || []).filter((e) => e.end > today && e.start < addDays(today, 14)).sort((a, b) => a.start - b.start)
+    .map((e) => `- ${ymd(e.start)} ${e.allDay ? "(journée)" : hm(e.start)} : ${e.title}`).join("\n") || "(rien)";
+  return `Tu es l'assistant maison et cuisine de « Nous deux », l'app privée de ${S.me.name} et ${partnerName()}, un couple du Québec. Tu parles présentement avec ${S.me.name}.
+Réponds en français québécois naturel, chaleureux et concis. Pas de longs préambules.
+Aujourd'hui : ${today.toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} (${ymd(today)}), ${hm(today)}.
+
+EMPLACEMENTS (id = nom) :
+${locs.map((l) => `${l.id} = ${l.emoji} ${l.name}`).join("\n")}
+
+INVENTAIRE ACTUEL (id | article | quantité | unité | emplacement | meilleur avant | note) :
+${inv}
+
+LISTE D'ÉPICERIE (à acheter) :
+${groc}
+
+AGENDA (14 prochains jours) :
+${soon}
+
+RÈGLES :
+- Quand on te dicte ce qu'on a (« on a 2 litres de lait… »), utilise add_pantry_items tout de suite, sans demander confirmation. Choisis l'emplacement le plus logique (produits laitiers, restes, fruits et légumes frais → frigo ; ce qui est dit « au congélo » ou congelé → congélo ; conserves, pâtes, riz, céréales, épices → garde-manger) sauf si on le précise.
+- Unités permises : ${UNITS.filter(Boolean).join(", ")}, ou "" pour des unités (ex. 12 œufs → qty 12, unit ""). Une douzaine = 12.
+- Si on dit qu'on a maintenant une certaine quantité d'un article déjà présent, utilise update_pantry_item plutôt que d'en créer un deuxième.
+- N'invente pas de date de péremption ; mets-en une seulement si on la donne.
+- Avant de retirer ou de diminuer des articles (ex. après avoir cuisiné), demande d'abord la confirmation, sauf si on te l'a demandé clairement.
+- Idées de repas : propose 1 à 3 options faisables avec l'inventaire, en priorisant ce qui expire bientôt, et dis ce qui manque. Pour une recette : titre, temps total, portions, ingrédients avec quantités, étapes numérotées. Offre d'ajouter ce qui manque à l'épicerie.
+- Après des modifications, résume en une ou deux lignes ce que tu as fait.
+- Tu vois seulement l'inventaire, l'épicerie et l'agenda ci-dessus ; jamais les messages, photos ou appels du couple.
+- Formatage simple : **gras**, listes avec « - » ou « 1. », titres avec « ## ». Pas de tableaux.`;
+}
+
+/* Rendu sûr (sans HTML) d'un texte façon Markdown */
+function mdInline(el, text) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  for (const p of parts) {
+    if (/^\*\*[^*]+\*\*$/.test(p)) el.append(h("b", { text: p.slice(2, -2) }));
+    else if (p) el.append(p);
+  }
+  return el;
+}
+function mdRender(text) {
+  const box = h("div", { class: "md" });
+  let list = null;
+  for (const raw of String(text || "").split("\n")) {
+    const line = raw.trimEnd();
+    let m;
+    if ((m = line.match(/^\s*(?:[-*•])\s+(.*)$/))) {
+      if (!list || list.tagName !== "UL") { list = h("ul"); box.append(list); }
+      list.append(mdInline(h("li"), m[1]));
+    } else if ((m = line.match(/^\s*(\d+)[.)]\s+(.*)$/))) {
+      if (!list || list.tagName !== "OL") { list = h("ol"); box.append(list); }
+      list.append(mdInline(h("li"), m[2]));
+    } else if ((m = line.match(/^#{1,4}\s+(.*)$/))) {
+      list = null; box.append(mdInline(h("h4"), m[1]));
+    } else if (!line.trim()) {
+      list = null;
+    } else {
+      list = null; box.append(mdInline(h("p"), line));
+    }
+  }
+  return box;
+}
+
+function asRender() {
+  const log = $("#as-log");
+  const items = [];
+  if (!AS.msgs.length) {
+    items.push(h("div", { class: "as-hello" },
+      h("div", { class: "big", text: "✨" }),
+      h("p", { text: `Salut ${S.me.name}! Dis-moi ce que vous avez dans le frigo, le congélo ou le garde-manger, ou demande-moi une idée de repas.` }),
+      h("p", { class: "as-note", text: "🔓 Ce que tu écris ici, ainsi que votre inventaire, votre liste d'épicerie et votre agenda à venir, est envoyé à Claude (Anthropic) pour répondre. Vos messages, photos et appels ne le sont jamais." })));
+  }
+  for (const m of AS.msgs) {
+    if (m.role === "user") {
+      for (const b of [].concat(m.content)) {
+        if (typeof b === "string") items.push(h("div", { class: "as-row me" }, h("div", { class: "as-b", text: b })));
+        else if (b.type === "text") items.push(h("div", { class: "as-row me" }, h("div", { class: "as-b", text: b.text })));
+        else if (b.type === "tool_result" && b._summary) items.push(h("div", { class: "as-act", text: b._summary }));
+      }
+    } else {
+      for (const b of m.content) if (b.type === "text" && b.text.trim()) items.push(h("div", { class: "as-row ai" }, h("div", { class: "as-b" }, mdRender(b.text))));
+    }
+  }
+  if (AS.busy) items.push(h("div", { class: "as-row ai" }, h("div", { class: "as-b" }, h("span", { class: "tdots" }, h("i"), h("i"), h("i")))));
+  log.replaceChildren(...items);
+  log.scrollTop = log.scrollHeight;
+  $("#as-sugg").replaceChildren(...(AS.msgs.length ? [] : AS_SUGG.map(([e, t]) => h("button", { class: "chip", onclick: () => asSend(t) }, `${e} ${t}`))));
+}
+function openAssistant(prefill) {
+  if (!KEY) return;
+  $("#assist").classList.remove("hidden");
+  history.pushState({ a: 1 }, "");
+  asRender();
+  if (prefill) $("#as-input").value = prefill;
+  setTimeout(() => $("#as-input").focus(), 200);
+}
+function closeAssistantNow() { asStopDictation(); $("#assist").classList.add("hidden"); }
+function closeAssistant() { if (history.state?.a) history.back(); else closeAssistantNow(); }
+function asReset() { AS.msgs = []; AS.busy = false; asRender(); }
+$("#as-close").onclick = closeAssistant;
+$("#as-new").onclick = () => { if (!AS.msgs.length || confirm("Commencer une nouvelle conversation?")) asReset(); };
+$("#btn-assist").onclick = () => openAssistant();
+const asInput = $("#as-input");
+asInput.addEventListener("input", () => { asInput.style.height = "auto"; asInput.style.height = Math.min(asInput.scrollHeight + 2, 132) + "px"; });
+$("#as-form").onsubmit = (e) => { e.preventDefault(); asSend(asInput.value); };
+
+async function asSend(text) {
+  text = String(text || "").trim();
+  if (!text || AS.busy) return;
+  asStopDictation();
+  asInput.value = ""; asInput.style.height = "auto";
+  AS.msgs.push({ role: "user", content: text });
+  AS.busy = true; asRender();
+  try {
+    for (let step = 0; step < 8; step++) {
+      const res = await be.callFn("assistant", {
+        system: asSystem(),
+        tools: AS_TOOLS,
+        messages: AS.msgs.map((m) => ({ role: m.role, content: Array.isArray(m.content) ? m.content.map(({ _summary, ...b }) => b) : m.content })),
+      }, 120000);
+      AS.msgs.push({ role: "assistant", content: res.content || [] });
+      const uses = (res.content || []).filter((b) => b.type === "tool_use");
+      if (res.stop_reason !== "tool_use" || !uses.length) break;
+      const results = [];
+      for (const u of uses) {
+        let out, summary;
+        try { [out, summary] = await asRunTool(u.name, u.input || {}); }
+        catch (e) { out = { ok: false, error: String(e.message || e) }; summary = "⚠️ " + (e.message || e); }
+        results.push({ type: "tool_result", tool_use_id: u.id, content: JSON.stringify(out), _summary: summary });
+      }
+      AS.msgs.push({ role: "user", content: results });
+      asRender();
+    }
+  } catch (e) {
+    console.error(e);
+    const msg = e?.message || String(e);
+    AS.msgs.push({ role: "assistant", content: [{ type: "text", text: "⚠️ " + (/not-found|NOT_FOUND/i.test(e?.code || "") ? "L'assistant n'est pas encore installé sur le serveur." : msg) }] });
+  }
+  AS.busy = false;
+  asRender();
+}
+
+/* Les outils : exécutés ici, avec le chiffrement habituel */
+const locLabel = (id) => { const l = locOf(id); return `${l.emoji} ${l.name}`; };
+async function asRunTool(name, x) {
+  const locIds = new Set(pantryLocs().map((l) => l.id));
+  const fixLoc = (l) => locIds.has(l) ? l : pantryLocs()[0].id;
+  const fixUnit = (u) => UNITS.includes(u || "") ? (u || "") : "";
+  const fixDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "") ? d : "";
+  if (name === "add_pantry_items") {
+    const done = [];
+    for (const raw of x.items || []) {
+      const data = { name: String(raw.name || "").trim().slice(0, 120), qty: Math.max(0, Number(raw.qty) || 0), unit: fixUnit(raw.unit), loc: fixLoc(raw.loc), exp: fixDate(raw.exp), note: String(raw.note || "").slice(0, 200) };
+      if (!data.name) continue;
+      const same = (S.pantry || []).find((it) => it.name.toLowerCase() === data.name.toLowerCase() && it.loc === data.loc && (it.unit || "") === data.unit && (it.exp || "") === data.exp);
+      if (same) { await savePantry(same, { qty: Math.round((Number(same.qty) + data.qty) * 100) / 100 }); same.qty = Number(same.qty) + data.qty; }
+      else {
+        const id = be.newId("pantry");
+        await be.set("pantry", id, { e: await encJ(data), by: S.me.uid, createdAt: be.ts() });
+        (S.pantry ||= []).push({ id, by: S.me.uid, createdAt: new Date(), ...data });
+      }
+      done.push(data);
+    }
+    const byLoc = {};
+    done.forEach((d) => (byLoc[d.loc] ||= []).push(`${d.name} (${fmtQty(d)})`));
+    return [{ ok: true, added: done.length }, "✅ Ajouté — " + Object.entries(byLoc).map(([l, a]) => `${locLabel(l)} : ${a.join(", ")}`).join(" · ")];
+  }
+  if (name === "update_pantry_item") {
+    const it = (S.pantry || []).find((p) => p.id === x.id);
+    if (!it) return [{ ok: false, error: "id introuvable" }, "⚠️ Article introuvable"];
+    const patch = {};
+    if (x.name) patch.name = String(x.name).slice(0, 120);
+    if (x.qty !== undefined) patch.qty = Math.max(0, Number(x.qty) || 0);
+    if (x.unit !== undefined) patch.unit = fixUnit(x.unit);
+    if (x.loc) patch.loc = fixLoc(x.loc);
+    if (x.exp !== undefined) patch.exp = fixDate(x.exp);
+    if (x.note !== undefined) patch.note = String(x.note).slice(0, 200);
+    await savePantry(it, patch);
+    Object.assign(it, patch);
+    return [{ ok: true }, `✏️ Modifié — ${it.name} : ${fmtQty(it)} (${locLabel(it.loc)})`];
+  }
+  if (name === "remove_pantry_items") {
+    const gone = (S.pantry || []).filter((p) => (x.ids || []).includes(p.id));
+    for (const it of gone) await be.remove("pantry", it.id);
+    S.pantry = (S.pantry || []).filter((p) => !gone.includes(p));
+    return [{ ok: true, removed: gone.length }, "🗑️ Retiré — " + (gone.map((g) => g.name).join(", ") || "rien")];
+  }
+  if (name === "add_to_grocery_list") {
+    const names = (x.items || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 40);
+    for (const n of names) await addToGrocery(n, true);
+    return [{ ok: true, added: names.length }, "🛒 Épicerie — " + names.join(", ")];
+  }
+  if (name === "add_calendar_event") {
+    const date = fixDate(x.date);
+    if (!date) return [{ ok: false, error: "date invalide" }, "⚠️ Date invalide"];
+    const allDay = !/^\d{2}:\d{2}$/.test(x.start || "");
+    let end = /^\d{2}:\d{2}$/.test(x.end || "") ? x.end : "";
+    if (!allDay && !end) { const [hh, mm] = x.start.split(":").map(Number); end = hm(new Date(2000, 0, 1, hh + 1, mm)); }
+    const data = { title: String(x.title || "Événement").slice(0, 200), allDay, date, endDate: !allDay && end <= x.start ? ymd(addDays(localDate(date), 1)) : date,
+      start: allDay ? "" : x.start, end: allDay ? "" : end, location: String(x.location || "").slice(0, 300), notes: String(x.notes || "").slice(0, 2000) };
+    await be.set("events", be.newId("events"), { e: await encJ(data), by: S.me.uid, createdAt: be.ts() });
+    return [{ ok: true }, `📅 Agenda — ${data.title}, ${calDayLabel(localDate(date))}${allDay ? "" : " à " + data.start}`];
+  }
+  return [{ ok: false, error: "outil inconnu" }, "⚠️ Outil inconnu"];
+}
+
+/* Dictée vocale (reconnaissance vocale de Chrome) */
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRec) $("#as-mic").classList.add("hidden");
+function asStopDictation() { try { AS.rec?.stop(); } catch {} }
+$("#as-mic").onclick = () => {
+  if (AS.rec) { asStopDictation(); return; }
+  const rec = new SpeechRec();
+  rec.lang = "fr-CA"; rec.interimResults = true; rec.continuous = true;
+  const base = asInput.value.trim() ? asInput.value.trim() + " " : "";
+  rec.onresult = (e) => {
+    let t = "";
+    for (const r of e.results) t += r[0].transcript;
+    asInput.value = base + t;
+    asInput.dispatchEvent(new Event("input"));
+  };
+  rec.onerror = (e) => { if (e.error === "not-allowed") toast("Permets l'accès au micro pour dicter."); };
+  rec.onend = () => { AS.rec = null; $("#as-mic").classList.remove("live"); };
+  AS.rec = rec;
+  $("#as-mic").classList.add("live");
+  try { rec.start(); } catch { AS.rec = null; $("#as-mic").classList.remove("live"); }
+};
 
 /* ============================================================
    « … écrit » (indicateur de frappe)
@@ -2862,6 +3178,7 @@ function callBubble(m, mine) {
 /* Bouton « retour » d'Android */
 window.addEventListener("popstate", () => {
   if (sheetEl) closeSheetNow();
+  else if (!$("#assist").classList.contains("hidden")) closeAssistantNow();
   else if (S.viewer) closeViewerNow();
   else if (S.openList) closeListNow();
 });

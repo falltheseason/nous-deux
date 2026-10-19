@@ -105,3 +105,34 @@ exports.turnCredentials = onCall(async (req) => {
   const iceServers = list.filter(Boolean).map((s) => ({ ...s, urls: [].concat(s.urls).filter((u) => !/:53(\?|$)/.test(u)) }));
   return { iceServers, configured: true };
 });
+
+// Assistant IA (Claude) : relais vers l'API d'Anthropic.
+// L'app envoie seulement ce dont l'assistant a besoin (inventaire, épicerie, agenda à venir).
+// Les modifications sont appliquées par l'app elle-même, qui garde le chiffrement.
+const ASSISTANT_MODEL = process.env.ASSISTANT_MODEL || "claude-sonnet-5-5";
+exports.assistant = onCall({ timeoutSeconds: 120, memory: "256MiB" }, async (req) => {
+  const uid = req.auth && req.auth.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Connexion requise");
+  const me = await db.collection("users").doc(uid).get();
+  if (!me.exists) throw new HttpsError("permission-denied", "Accès refusé");
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new HttpsError("failed-precondition", "L'assistant n'est pas encore configuré (clé d'API manquante).");
+  const { system, messages, tools } = req.data || {};
+  if (!Array.isArray(messages) || !messages.length || messages.length > 120) throw new HttpsError("invalid-argument", "Conversation invalide");
+  if (JSON.stringify(req.data).length > 300000) throw new HttpsError("invalid-argument", "Conversation trop longue : commence une nouvelle conversation.");
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({ model: ASSISTANT_MODEL, max_tokens: 2048, system: String(system || "").slice(0, 60000), messages, tools: Array.isArray(tools) ? tools : undefined }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    console.error("Anthropic", r.status, j && j.error);
+    const msg = (j && j.error && j.error.message) || `Erreur ${r.status}`;
+    if (r.status === 401) throw new HttpsError("permission-denied", "Clé d'API refusée par Anthropic.");
+    if (r.status === 400 && /credit/i.test(msg)) throw new HttpsError("resource-exhausted", "Plus de crédits sur le compte Anthropic.");
+    if (r.status === 429 || r.status === 529) throw new HttpsError("resource-exhausted", "L'assistant est surchargé, réessaie dans un instant.");
+    throw new HttpsError("unavailable", msg);
+  }
+  return { content: j.content, stop_reason: j.stop_reason, usage: j.usage, model: j.model };
+});

@@ -43,13 +43,13 @@ async function sendTo(userDoc, data) {
 }
 
 // Prévient l'autre personne
-async function notifyOthers(by, makeBody, tag) {
+async function notifyOthers(by, makeBody, tag, extra) {
   const users = await db.collection("users").get();
   const sender = users.docs.find((d) => d.id === by);
   const name = (sender && sender.get("name")) || "Ton amour";
   for (const u of users.docs) {
     if (u.id === by) continue;
-    await sendTo(u, { title: "Nous deux", body: makeBody(name), tag });
+    await sendTo(u, { title: "Nous deux", body: makeBody(name), tag, ...(extra || {}) });
   }
 }
 
@@ -65,10 +65,31 @@ exports.notifierEvenement = onDocumentCreated("events/{id}", async (event) => {
   await notifyOthers(ev.by, (n) => `${n} a ajouté un événement à l'agenda 📅`, "agenda");
 });
 
-exports.notifierAppel = onDocumentCreated("calls/{id}", async (event) => {
+// Appel : on « fait sonner » en renvoyant l'alerte toutes les 5 s tant que ça sonne,
+// puis « Appel manqué » si personne n'a répondu.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+exports.notifierAppel = onDocumentCreated({ document: "calls/{id}", timeoutSeconds: 90 }, async (event) => {
   const c = event.data && event.data.data();
   if (!c || !c.by || c.status !== "ringing") return;
-  await notifyOthers(c.by, (n) => `📞 ${n} t'appelle${c.video ? " en vidéo" : ""}… Touche pour répondre`, "call");
+  const ref = event.data.ref;
+  const kind = c.video ? " en vidéo" : "";
+  for (let i = 0; i < 9; i++) {
+    const snap = i === 0 ? event.data : await ref.get();
+    if (!snap.exists || snap.get("status") !== "ringing") break;
+    await notifyOthers(c.by, (n) => `📞 ${n} t'appelle${kind}… Touche pour répondre`, "call", { kind: "ring" });
+    await sleep(5000);
+  }
+  // attendre que l'appel se termine (l'appelant abandonne après 45 s)
+  let st = "ringing";
+  for (let i = 0; i < 6; i++) {
+    const snap = await ref.get();
+    st = snap.exists ? snap.get("status") : "cancelled";
+    if (st !== "ringing") break;
+    await sleep(3000);
+  }
+  if (["ringing", "missed", "cancelled", "failed"].includes(st)) {
+    await notifyOthers(c.by, (n) => `📵 Appel${c.video ? " vidéo" : ""} manqué de ${n}`, "call", { kind: "missed" });
+  }
 });
 
 // Bouton « Tester les notifications » : envoie à TES appareils et note le résultat

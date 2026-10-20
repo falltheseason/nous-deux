@@ -339,6 +339,9 @@ nav.tabs button{font-size:11px}
 #as-mic.live{background:#e5394b;color:#fff;animation:blink 1.2s infinite}
 .addrow #pan-search{flex:1;min-width:0}
 
+.gstep{display:flex;gap:12px;align-items:flex-start}
+.gnum{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:800;flex:none}
+
 /* Toast */
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 84px);transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:999px;font-weight:700;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:30;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -1371,6 +1374,7 @@ function startApp() {
   setTab(S.view);
   renderNotifBanner();
   refreshNotifToken();
+  clearNotifs();
   setTimeout(() => iceServers(), 3000);
 }
 
@@ -1555,7 +1559,7 @@ function onNewMessages() {
   $("#chat-dot").classList.toggle("show", unread > 0);
   if (unread) navigator.setAppBadge?.(unread).catch(() => {});
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) markSeen(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { markSeen(); if (KEY) clearNotifs(); } });
 
 /* ============================================================
    Listes
@@ -1791,6 +1795,7 @@ function openSettings() {
     bioSupported() ? menuRow("👆", bioRecord() ? "Désactiver l'empreinte" : "Déverrouiller avec l'empreinte",
       bioRecord() ? "Activée sur cet appareil" : "Au lieu du NIP, sur cet appareil",
       () => { if (bioRecord()) { lsDel("bio"); closeSheet(); toast("Empreinte désactivée"); } else { closeSheetNow(); bioSetup(); } }) : null,
+    menuRow("🔊", "Sons et alertes", "Pour ne plus manquer un appel ou un message", () => { closeSheetNow(); soundGuide(); }),
     menuRow("🧪", "Tester les notifications", "Envoie une notification de test sur tes appareils", () => { closeSheet(); testNotifs(); }),
     menuRow("🔒", "Verrouiller maintenant", "Il faudra entrer ton NIP", () => { closeSheetNow(); lock(); }),
     menuRow("👋", "Se déconnecter", S.me.email ? S.me.email + " · la phrase secrète sera oubliée sur cet appareil" : "",
@@ -1851,6 +1856,21 @@ async function refreshNotifToken() {
     if (token && old && token !== old) await be.set("users", S.me.uid, { fcm: be.arrayRemove(old) }, true).catch(() => {});
     if (token) lsSet("fcm", token);
   } catch (e) { console.warn(e); }
+}
+
+function clearNotifs() {
+  navigator.serviceWorker?.ready.then((reg) => reg.getNotifications()).then((ns) => ns?.forEach((n) => n.close())).catch(() => {});
+}
+function soundGuide() {
+  const step = (n, t, d) => h("div", { class: "gstep" }, h("span", { class: "gnum", text: n }), h("div", {}, h("b", { text: t }), d ? h("div", { class: "psub", text: d }) : null));
+  openSheet("Sons et alertes", h("div", { style: "display:flex;flex-direction:column;gap:14px" },
+    h("p", { class: "psub", style: "font-size:14px", text: "Android range les alertes des apps web comme des notifications ordinaires. Ces réglages les rendent aussi visibles et sonores qu'un vrai appel." }),
+    step("1", "Ouvre les réglages Android", "Paramètres → Applications → Nous deux (si l'app n'y est pas : Chrome) → Notifications."),
+    step("2", "Autorise et mets en « Alerte »", "Pas « Silencieux ». Active « Son », « Afficher en pop-up » (ou « Notifications flottantes ») et « Écran de verrouillage »."),
+    step("3", "Choisis une sonnerie distincte", "Dans la même page, touche « Son » et prends une sonnerie que tu reconnais : tu sauras tout de suite que c'est Nous deux."),
+    step("4", "Ne pas déranger", "Si tu utilises « Ne pas déranger », ajoute Nous deux (ou Chrome) aux exceptions."),
+    step("5", "Économie de batterie", "Paramètres → Applications → Nous deux (ou Chrome) → Batterie : choisis « Sans restriction » pour que les alertes arrivent tout de suite."),
+    h("div", { class: "rowbtns" }, h("button", { class: "btn", text: "🧪 Tester maintenant", onclick: () => { closeSheet(); testNotifs(); } }))));
 }
 
 /* Test : le serveur envoie une notification sur tes propres appareils et dit ce qui s'est passé */

@@ -1,6 +1,6 @@
 // Service worker : installation, ouverture rapide hors ligne et notifications.
 // Toujours « réseau d'abord » pour que les mises à jour arrivent tout de suite.
-const CACHE = "nous-deux-v5";
+const CACHE = "nous-deux-v6";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -44,8 +44,9 @@ self.addEventListener("push", (e) => {
       tag: d.tag || "nous-deux",
       renotify: !looking,
       silent: looking,
-      vibrate: looking ? undefined : d.tag === "call" ? [600, 300, 600, 300, 600, 300, 600] : [120, 60, 120],
-      requireInteraction: d.tag === "call" && !looking,
+      vibrate: looking ? undefined : d.kind === "ring" ? [900, 300, 900, 300, 900, 300, 900] : [250, 120, 250],
+      requireInteraction: d.kind === "ring" && !looking,
+      actions: d.kind === "ring" ? [{ action: "answer", title: "📞 Répondre" }] : [],
       data: { url: "./" },
     });
     if (looking) {

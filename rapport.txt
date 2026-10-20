@@ -1,0 +1,203 @@
+Exécution 39417107895 — Tue Oct 20 11:46:58 UTC 2026 — résultat : success
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated json-ptr@3.1.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+[1m[37m===[39m Deploying to 'nous-2-48a67'...[22m
+
+[36m[1mi [22m[39m deploying [1mfunctions[22m
+[36m[1mi  functions:[22m[39m preparing codebase [1mdefault[22m for deployment
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudfunctions.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudbuild.googleapis.com[22m is enabled...
+[36m[1mi  artifactregistry:[22m[39m ensuring required API [1martifactregistry.googleapis.com[22m is enabled...
+[32m[1m✔  functions:[22m[39m required API [1mcloudfunctions.googleapis.com[22m is enabled
+[32m[1m✔  artifactregistry:[22m[39m required API [1martifactregistry.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1mcloudbuild.googleapis.com[22m is enabled
+[36m[1mi [22m[39m [36m[1mfunctions: [22m[39mLoaded environment variables from functions/.env
+[36m[1mi  functions:[22m[39m Loading and analyzing source code for codebase default to determine what to deploy
+Serving at port 8351
+
+[36m[1mi  extensions:[22m[39m ensuring required API [1mfirebaseextensions.googleapis.com[22m is enabled...
+[32m[1m✔  extensions:[22m[39m required API [1mfirebaseextensions.googleapis.com[22m is enabled
+[36m[1mi [22m[39m [36m[1mfunctions: [22m[39mLoaded environment variables from functions/.env
+[36m[1mi  functions:[22m[39m preparing [1mfunctions[22m directory for uploading...
+[36m[1mi [22m[39m [36m[1mfunctions:[22m[39m packaged [1m/home/runner/work/nous-deux/nous-deux/functions[22m (34.9 KB) for uploading
+[36m[1mi  functions:[22m[39m ensuring required API [1mrun.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1meventarc.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mpubsub.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mstorage.googleapis.com[22m is enabled...
+[32m[1m✔  functions:[22m[39m required API [1mrun.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1meventarc.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1mpubsub.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1mstorage.googleapis.com[22m is enabled
+[36m[1mi  functions:[22m[39m generating the service identity for [1mpubsub.googleapis.com[22m...
+[36m[1mi  functions:[22m[39m generating the service identity for [1meventarc.googleapis.com[22m...
+[32m[1m✔  functions:[22m[39m [1mfunctions[22m source uploaded successfully
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mnotifierMessage(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mnotifierEvenement(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mnotifierAppel(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mtesterNotification(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mturnCredentials(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1massistant(northamerica-northeast1)[22m...
+[32m[1m✔ [22m[39m [1m[32mfunctions[notifierMessage(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[notifierEvenement(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[turnCredentials(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[notifierAppel(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[testerNotification(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[assistant(northamerica-northeast1)][39m[22m Successful update operation.
+
+[32m[1m✔ [22m[39m [1m[4mDeploy complete![24m[22m
+
+[1mProject Console:[22m https://console.firebase.google.com/project/nous-2-48a67/overview
+=== Assistant (clé Anthropic) ===
+HTTP 200
+"id":"claude-sonnet-5-5"
+1er appel : tool_use | blocs : tool_use
+2e appel : end_turn | C'est fait : 5 oignons moyens sont ajoutés à la garde.
+ASSISTANT OK
+=== Relais d'appels Cloudflare ===
+HTTP 201
+"urls":["stun:stun.cloudflare.com:3478","stun:stun.cloudflare.com:443"]
+"urls":["turn:turn.cloudflare.com:3478?transport=udp","turn:turn.cloudflare.com:3478?transport=tcp","turns:turn.cloudflare.com:5349?transport=tcp","turn:turn.cloudflare.com:443?transport=udp","turn:turn.cloudflare.com:80?transport=tcp","turns:turn.cloudflare.com:443?transport=tcp"]
+=== Fonctions installées ===
+NAME                STATE   ENVIRONMENT  LOCATION
+assistant           ACTIVE  GEN_2
+notifierAppel       ACTIVE  GEN_2
+notifierEvenement   ACTIVE  GEN_2
+notifierMessage     ACTIVE  GEN_2
+testerNotification  ACTIVE  GEN_2
+turnCredentials     ACTIVE  GEN_2
+=== Base Firestore ===
+ND_REGION=northamerica-northeast1
+CF_TURN_KEY_ID=(présent)
+=== Déclencheurs Eventarc ===
+NAME                       TYPE                                        DESTINATION                          ACTIVE  LOCATION
+notifiermessage-006825     google.cloud.firestore.document.v1.created  Cloud Functions: notifierMessage     Yes     northamerica-northeast1
+notifierappel-632219       google.cloud.firestore.document.v1.created  Cloud Functions: notifierAppel       Yes     northamerica-northeast1
+testernotification-070379  google.cloud.firestore.document.v1.created  Cloud Functions: testerNotification  Yes     northamerica-northeast1
+notifierevenement-283909   google.cloud.firestore.document.v1.created  Cloud Functions: notifierEvenement   Yes     northamerica-northeast1
+=== Base Firestore (détails) ===
+databaseEdition: STANDARD
+locationId: northamerica-northeast1
+type: FIRESTORE_NATIVE
+=== Rôles du compte de calcul ===
+roles/cloudbuild.builds.builder
+roles/editor
+roles/eventarc.eventReceiver
+roles/run.invoker
+=== Journal assistant ===
+LEVEL  NAME       EXECUTION_ID  TIME_UTC                 LOG
+I      assistant                2026-10-20 11:46:32.948  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      assistant                2026-10-20 11:46:30.041  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+D      assistant  g45j9fi6wagn  2026-10-20 03:18:18.052  Callable request verification passed
+I      assistant                2026-10-20 03:18:18.046
+D      assistant  g45hc4izx6rb  2026-10-20 03:18:15.558  Callable request verification passed
+I      assistant                2026-10-20 03:18:15.552
+I      assistant                2026-10-20 03:18:15.506
+D      assistant  g44r3f6jn439  2026-10-20 03:17:41.548  Callable request verification passed
+I      assistant                2026-10-20 03:17:41.542
+D      assistant  g44ojh9qvryk  2026-10-20 03:17:38.239  Callable request verification passed
+I      assistant                2026-10-20 03:17:38.232
+I      assistant                2026-10-20 03:17:38.177
+D      assistant  g43hu3mr8vmy  2026-10-20 03:16:42.892  Callable request verification passed
+I      assistant                2026-10-20 03:16:42.887
+D      assistant  g43g6u7suxqt  2026-10-20 03:16:40.760  Callable request verification passed
+I      assistant                2026-10-20 03:16:40.753
+I      assistant                2026-10-20 03:16:40.699
+D      assistant  g42lfebfinq6  2026-10-20 03:16:00.892  Callable request verification passed
+I      assistant                2026-10-20 03:16:00.883
+D      assistant  g42iinpbli1p  2026-10-20 03:15:57.121  Callable request verification passed
+I      assistant                2026-10-20 03:15:57.114
+I      assistant                2026-10-20 03:15:57.077
+D      assistant  g426hb3sppi9  2026-10-20 03:15:41.521  Callable request verification passed
+I      assistant                2026-10-20 03:15:41.514
+D      assistant  g424mdq7jt9a  2026-10-20 03:15:39.189  Callable request verification passed
+I      assistant                2026-10-20 03:15:39.090
+I      assistant                2026-10-20 03:15:38.834  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      assistant                2026-10-20 03:15:37.206  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      assistant                2026-10-20 03:15:37.184
+D      assistant  g12euijsviyc  2026-10-20 01:51:53.514  Callable request verification passed
+I      assistant                2026-10-20 01:51:53.508
+D      assistant  g12cz5qmyr5e  2026-10-20 01:51:51.090  Callable request verification passed
+I      assistant                2026-10-20 01:51:51.084
+I      assistant                2026-10-20 01:51:51.042
+D      assistant  g11t1qfyq0mr  2026-10-20 01:51:25.262  Callable request verification passed
+I      assistant                2026-10-20 01:51:25.257
+D      assistant  g11r7wtnpb56  2026-10-20 01:51:22.893  Callable request verification passed
+I      assistant                2026-10-20 01:51:22.887
+I      assistant                2026-10-20 01:51:22.846
+D      assistant  g114o91h4gbm  2026-10-20 01:50:53.674  Callable request verification passed
+=== Journal turnCredentials ===
+LEVEL  NAME             EXECUTION_ID  TIME_UTC                 LOG
+I      turncredentials                2026-10-20 11:46:17.539  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-10-20 11:46:14.699  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+D      turncredentials  gkhxp7cxgo4o  2026-10-20 10:55:50.562  Callable request verification passed
+I      turncredentials                2026-10-20 10:55:50.472
+I      turncredentials                2026-10-20 10:55:50.381  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-10-20 10:55:48.664  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      turncredentials                2026-10-20 10:55:48.632
+D      turncredentials  g40vgj1524to  2026-10-20 03:14:40.653  Callable request verification passed
+I      turncredentials                2026-10-20 03:14:40.559
+I      turncredentials                2026-10-20 03:14:40.393  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-10-20 03:14:38.635  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      turncredentials                2026-10-20 03:14:38.616
+D      turncredentials  g0so496txlmd  2026-10-20 01:44:18.971  Callable request verification passed
+I      turncredentials                2026-10-20 01:44:18.964
+I      turncredentials                2026-10-20 01:44:18.914
+D      turncredentials  g0m8r7nrw34n  2026-10-20 01:39:19.211  Callable request verification passed
+I      turncredentials                2026-10-20 01:39:19.099
+I      turncredentials                2026-10-20 01:39:18.965  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-10-20 01:39:17.080  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      turncredentials                2026-10-20 01:39:17.057
+D      turncredentials  fx97ma8npys8  2026-10-20 00:05:12.276  Callable request verification passed
+I      turncredentials                2026-10-20 00:05:12.269
+I      turncredentials                2026-10-20 00:05:12.195
+D      turncredentials  fx8bcrbfgv79  2026-10-20 00:04:30.527  Callable request verification passed
+I      turncredentials                2026-10-20 00:04:30.437
+I      turncredentials                2026-10-20 00:04:30.281  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-10-20 00:04:28.514  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      turncredentials                2026-10-20 00:04:28.505
+I      turncredentials                2026-10-19 23:49:18.483  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-10-19 23:49:15.903  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+I      turncredentials                2026-10-19 21:51:28.233  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-10-19 21:51:24.431  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+D      turncredentials  fryxzdu6l28v  2026-10-19 21:37:15.223  Callable request verification passed
+I      turncredentials                2026-10-19 21:37:15.119
+I      turncredentials                2026-10-19 21:37:15.053
+I      turncredentials                2026-10-19 21:33:34.037  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-10-19 21:33:31.791  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+D      turncredentials  f96o9v9v7gle  2026-10-19 12:51:23.174  Callable request verification passed
+I      turncredentials                2026-10-19 12:51:23.086
+I      turncredentials                2026-10-19 12:51:22.955  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+=== Journal notifierAppel ===
+LEVEL  NAME           EXECUTION_ID  TIME_UTC                 LOG
+I      notifierappel                2026-10-20 11:46:19.774  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-20 11:46:17.622  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+I      notifierappel                2026-10-20 10:56:52.576  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-20 10:56:50.014  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      notifierappel                2026-10-20 10:56:49.979
+I      notifierappel                2026-10-20 00:04:37.665  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-20 00:04:35.908  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      notifierappel                2026-10-20 00:04:35.871
+I      notifierappel                2026-10-19 23:49:19.156  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-19 23:49:16.912  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+I      notifierappel                2026-10-19 21:51:27.391  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-19 21:51:24.432  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+I      notifierappel                2026-10-19 21:33:34.497  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-19 21:33:31.892  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+I      notifierappel                2026-10-19 20:57:13.599  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-19 20:57:11.755  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      notifierappel                2026-10-19 20:57:11.698
+I      notifierappel                2026-10-18 23:07:16.129  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-18 23:07:13.768  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+I      notifierappel                2026-10-18 22:55:04.240
+I      notifierappel                2026-10-18 22:54:20.058
+I      notifierappel                2026-10-18 22:53:28.670
+I      notifierappel                2026-10-18 22:40:39.975  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-10-18 22:40:37.444  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+=== Journal Eventarc / Cloud Run (erreurs) ===
+2026-10-20T01:39:53.701759Z	ERROR			
+2026-10-20T01:38:50.185884Z	ERROR			
+2026-10-20T01:38:25.213952Z	ERROR			
+2026-10-20T01:37:40.628797Z	ERROR			

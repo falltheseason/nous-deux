@@ -2565,12 +2565,14 @@ if (!SpeechRec) $("#as-mic").classList.add("hidden");
 function asStopDictation() { try { AS.rec?.stop(); } catch {} }
 $("#as-mic").onclick = () => {
   if (AS.rec) { asStopDictation(); return; }
+  // Une phrase à la fois : sur Android, le mode « continu » répète le texte en boucle.
+  // Touche le micro de nouveau pour ajouter une autre phrase.
   const rec = new SpeechRec();
-  rec.lang = "fr-CA"; rec.interimResults = true; rec.continuous = true;
+  rec.lang = "fr-CA"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
   const base = asInput.value.trim() ? asInput.value.trim() + " " : "";
   rec.onresult = (e) => {
-    let t = "";
-    for (const r of e.results) t += r[0].transcript;
+    const last = e.results[e.results.length - 1];
+    const t = (last?.[0]?.transcript || "").trim();
     asInput.value = base + t;
     asInput.dispatchEvent(new Event("input"));
   };

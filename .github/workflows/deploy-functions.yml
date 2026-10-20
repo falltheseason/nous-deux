@@ -6,6 +6,7 @@ on:
     paths:
       - "functions/**"
       - "firebase.json"
+      - ".github/scripts/**"
       - ".github/workflows/deploy-functions.yml"
   workflow_dispatch:
 
@@ -113,6 +114,7 @@ jobs:
               code=$(curl -s -o "$RUNNER_TEMP/models.json" -w "%{http_code}" https://api.anthropic.com/v1/models?limit=100 -H "x-api-key: $AI_KEY" -H "anthropic-version: 2023-06-01")
               echo "HTTP $code"
               grep -o '"id":"claude-sonnet-5-5[^"]*"' "$RUNNER_TEMP/models.json" | head -2 || echo "modèle claude-sonnet-5-5 introuvable dans la liste"
+              node .github/scripts/assistant-selftest.mjs 2>&1 || true
             else
               echo "Secret ANTHROPIC_API_KEY absent"
             fi

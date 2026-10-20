@@ -940,8 +940,9 @@ function demoBackend() {
       if (name !== "assistant") return { iceServers: [], configured: false };
       await new Promise((r) => setTimeout(r, 300));
       const last = data.messages.at(-1);
-      if (Array.isArray(last.content)) return { stop_reason: "end_turn", content: [{ type: "text", text: "C'est noté! J'ai ajouté **2 L de lait** et **12 œufs** au frigo, et **3 poitrines de poulet** au congélo." }] };
-      const t = String(last.content).toLowerCase();
+      (window.__asSystems ||= []).push(data.system);
+      if (last.content[0]?.type === "tool_result") return { stop_reason: "end_turn", content: [{ type: "text", text: "C'est noté! J'ai ajouté **2 L de lait** et **12 œufs** au frigo, et **3 poitrines de poulet** au congélo." }] };
+      const t = String(last.content[0]?.text || last.content).toLowerCase().split("</contexte>").pop();
       if (/mange|recette|souper/.test(t)) return { stop_reason: "end_turn", content: [{ type: "text", text: "## Poulet au riz\n**30 min · 2 portions**\n\nIngrédients :\n- 2 poitrines de poulet\n- 1 tasse de riz\n\n1. Cuire le riz.\n2. Saisir le poulet." }] };
       return { stop_reason: "tool_use", content: [{ type: "text", text: "Parfait, je m'en occupe." }, { type: "tool_use", id: "tu1", name: "add_pantry_items",
         input: { items: [{ name: "Lait", qty: 2, unit: "L", loc: "frigo" }, { name: "Œufs", qty: 12, unit: "", loc: "frigo" }, { name: "Poitrines de poulet", qty: 3, unit: "", loc: "congelo" }] } }] };
@@ -1299,7 +1300,7 @@ function lockState() {
   Object.assign(S, { messages: [], lists: [], items: [], photos: [], photosById: new Map(), photosLoaded: false });
   ["#msgs", "#grid", "#list-cards", "#items-todo", "#items-done", "#cal-body"].forEach((s) => $(s).replaceChildren());
   S.events = []; msgSeen = null; S.pantry = []; S.pantryLocs = null;
-  closeAssistantNow(); AS.msgs = []; AS.busy = false;
+  closeAssistantNow(); AS.msgs = []; AS.busy = false; AS.system = null;
   $("#pan-list").replaceChildren();
   if (Call.id || Call.status) endCall();
   if (Rec.mr) stopRec(false);
@@ -2314,7 +2315,7 @@ $("#pan-search").addEventListener("input", (e) => { Pan.q = e.target.value; rend
    envoyés à Claude (Anthropic) pour qu'il puisse t'aider. Les changements
    sont faits ici, dans l'app, et restent chiffrés dans Firebase.
    ============================================================ */
-const AS = { msgs: [], busy: false, rec: null };
+const AS = { msgs: [], busy: false, rec: null, system: null };
 const AS_SUGG = [
   ["🧊", "Faire l'inventaire du frigo"],
   ["🍽️", "On mange quoi ce soir?"],
@@ -2339,40 +2340,45 @@ const AS_TOOLS = [
       start: { type: "string", description: "HH:MM (absent = toute la journée)" }, end: { type: "string", description: "HH:MM" }, location: { type: "string" }, notes: { type: "string" } } } },
 ];
 
+// Instructions fixes pour toute la conversation (l'IA exige qu'elles ne changent pas)
 function asSystem() {
   const today = new Date();
-  const locs = pantryLocs();
-  const inv = (S.pantry || []).map((it) => `${it.id} | ${it.name} | ${it.qty} | ${it.unit || "unité"} | ${it.loc} | ${it.exp || "-"} | ${it.note || ""}`).join("\n") || "(vide)";
-  const g = S.lists.find((l) => /[ée]picerie/i.test(l.title));
-  const groc = g ? itemsOf(g.id).filter((i) => !i.done).map((i) => "- " + i.text).join("\n") || "(vide)" : "(pas de liste)";
-  const soon = (S.events || []).filter((e) => e.end > today && e.start < addDays(today, 14)).sort((a, b) => a.start - b.start)
-    .map((e) => `- ${ymd(e.start)} ${e.allDay ? "(journée)" : hm(e.start)} : ${e.title}`).join("\n") || "(rien)";
   return `Tu es l'assistant maison et cuisine de « Nous deux », l'app privée de ${S.me.name} et ${partnerName()}, un couple du Québec. Tu parles présentement avec ${S.me.name}.
 Réponds en français québécois naturel, chaleureux et concis. Pas de longs préambules.
-Aujourd'hui : ${today.toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} (${ymd(today)}), ${hm(today)}.
+Date du début de la conversation : ${today.toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} (${ymd(today)}).
 
-EMPLACEMENTS (id = nom) :
-${locs.map((l) => `${l.id} = ${l.emoji} ${l.name}`).join("\n")}
-
-INVENTAIRE ACTUEL (id | article | quantité | unité | emplacement | meilleur avant | note) :
-${inv}
-
-LISTE D'ÉPICERIE (à acheter) :
-${groc}
-
-AGENDA (14 prochains jours) :
-${soon}
+Chaque message de l'usager commence par un bloc <contexte> qui contient l'état À JOUR de l'inventaire (avec les id), des emplacements, de la liste d'épicerie et de l'agenda. Fie-toi toujours au plus récent ; ne mentionne pas ce bloc.
 
 RÈGLES :
-- Quand on te dicte ce qu'on a (« on a 2 litres de lait… »), utilise add_pantry_items tout de suite, sans demander confirmation. Choisis l'emplacement le plus logique (produits laitiers, restes, fruits et légumes frais → frigo ; ce qui est dit « au congélo » ou congelé → congélo ; conserves, pâtes, riz, céréales, épices → garde-manger) sauf si on le précise.
+- Quand on te dicte ce qu'on a (« on a 2 litres de lait… »), utilise add_pantry_items tout de suite, sans demander confirmation. Choisis l'emplacement le plus logique (produits laitiers, restes, fruits et légumes frais → frigo ; ce qui est dit « au congélo » ou congelé → congélo ; conserves, pâtes, riz, céréales, épices, oignons, patates → garde-manger) sauf si on le précise.
 - Unités permises : ${UNITS.filter(Boolean).join(", ")}, ou "" pour des unités (ex. 12 œufs → qty 12, unit ""). Une douzaine = 12.
-- Si on dit qu'on a maintenant une certaine quantité d'un article déjà présent, utilise update_pantry_item plutôt que d'en créer un deuxième.
+- Si on dit qu'on a maintenant une certaine quantité d'un article déjà présent, utilise update_pantry_item (avec son id) plutôt que d'en créer un deuxième.
 - N'invente pas de date de péremption ; mets-en une seulement si on la donne.
 - Avant de retirer ou de diminuer des articles (ex. après avoir cuisiné), demande d'abord la confirmation, sauf si on te l'a demandé clairement.
 - Idées de repas : propose 1 à 3 options faisables avec l'inventaire, en priorisant ce qui expire bientôt, et dis ce qui manque. Pour une recette : titre, temps total, portions, ingrédients avec quantités, étapes numérotées. Offre d'ajouter ce qui manque à l'épicerie.
 - Après des modifications, résume en une ou deux lignes ce que tu as fait.
-- Tu vois seulement l'inventaire, l'épicerie et l'agenda ci-dessus ; jamais les messages, photos ou appels du couple.
+- Tu vois seulement l'inventaire, l'épicerie et l'agenda du contexte ; jamais les messages, photos ou appels du couple.
 - Formatage simple : **gras**, listes avec « - » ou « 1. », titres avec « ## ». Pas de tableaux.`;
+}
+// État à jour, joint à chaque message de l'usager
+function asContext() {
+  const now = new Date();
+  const inv = (S.pantry || []).map((it) => `${it.id} | ${it.name} | ${it.qty} | ${it.unit || "unité"} | ${it.loc} | ${it.exp || "-"} | ${it.note || ""}`).join("\n") || "(vide)";
+  const g = S.lists.find((l) => /[ée]picerie/i.test(l.title));
+  const groc = g ? itemsOf(g.id).filter((i) => !i.done).map((i) => "- " + i.text).join("\n") || "(vide)" : "(pas de liste)";
+  const soon = (S.events || []).filter((e) => e.end > now && e.start < addDays(now, 14)).sort((a, b) => a.start - b.start)
+    .map((e) => `- ${ymd(e.start)} ${e.allDay ? "(journée)" : hm(e.start)} : ${e.title}`).join("\n") || "(rien)";
+  return `<contexte>
+Maintenant : ${now.toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long" })} (${ymd(now)}), ${hm(now)}
+EMPLACEMENTS (id = nom) :
+${pantryLocs().map((l) => `${l.id} = ${l.emoji} ${l.name}`).join("\n")}
+INVENTAIRE (id | article | quantité | unité | emplacement | meilleur avant | note) :
+${inv}
+LISTE D'ÉPICERIE (à acheter) :
+${groc}
+AGENDA (14 prochains jours) :
+${soon}
+</contexte>`;
 }
 
 /* Rendu sûr (sans HTML) d'un texte façon Markdown */
@@ -2417,7 +2423,9 @@ function asRender() {
       h("p", { class: "as-note", text: "🔓 Ce que tu écris ici, ainsi que votre inventaire, votre liste d'épicerie et votre agenda à venir, est envoyé à Claude (Anthropic) pour répondre. Vos messages, photos et appels ne le sont jamais." })));
   }
   for (const m of AS.msgs) {
-    if (m.role === "user") {
+    if (m.role === "user" && m._display) {
+      items.push(h("div", { class: "as-row me" }, h("div", { class: "as-b", text: m._display })));
+    } else if (m.role === "user") {
       for (const b of [].concat(m.content)) {
         if (typeof b === "string") items.push(h("div", { class: "as-row me" }, h("div", { class: "as-b", text: b })));
         else if (b.type === "text") items.push(h("div", { class: "as-row me" }, h("div", { class: "as-b", text: b.text })));
@@ -2442,7 +2450,7 @@ function openAssistant(prefill) {
 }
 function closeAssistantNow() { asStopDictation(); $("#assist").classList.add("hidden"); }
 function closeAssistant() { if (history.state?.a) history.back(); else closeAssistantNow(); }
-function asReset() { AS.msgs = []; AS.busy = false; asRender(); }
+function asReset() { AS.msgs = []; AS.busy = false; AS.system = null; asRender(); }
 $("#as-close").onclick = closeAssistant;
 $("#as-new").onclick = () => { if (!AS.msgs.length || confirm("Commencer une nouvelle conversation?")) asReset(); };
 $("#btn-assist").onclick = () => openAssistant();
@@ -2455,12 +2463,13 @@ async function asSend(text) {
   if (!text || AS.busy) return;
   asStopDictation();
   asInput.value = ""; asInput.style.height = "auto";
-  AS.msgs.push({ role: "user", content: text });
+  AS.system ??= asSystem();
+  AS.msgs.push({ role: "user", content: [{ type: "text", text: asContext() + "\n\n" + text }], _display: text });
   AS.busy = true; asRender();
   try {
     for (let step = 0; step < 8; step++) {
       const res = await be.callFn("assistant", {
-        system: asSystem(),
+        system: AS.system,
         tools: AS_TOOLS,
         messages: AS.msgs.map((m) => ({ role: m.role, content: Array.isArray(m.content) ? m.content.map(({ _summary, ...b }) => b) : m.content })),
       }, 120000);
@@ -2505,11 +2514,11 @@ async function asRunTool(name, x) {
         await be.set("pantry", id, { e: await encJ(data), by: S.me.uid, createdAt: be.ts() });
         (S.pantry ||= []).push({ id, by: S.me.uid, createdAt: new Date(), ...data });
       }
-      done.push(data);
+      done.push({ ...data, id: same ? same.id : (S.pantry || []).at(-1)?.id });
     }
     const byLoc = {};
     done.forEach((d) => (byLoc[d.loc] ||= []).push(`${d.name} (${fmtQty(d)})`));
-    return [{ ok: true, added: done.length }, "✅ Ajouté — " + Object.entries(byLoc).map(([l, a]) => `${locLabel(l)} : ${a.join(", ")}`).join(" · ")];
+    return [{ ok: true, items: done.map((d) => ({ id: d.id, name: d.name, qty: d.qty, unit: d.unit, loc: d.loc })) }, "✅ Ajouté — " + Object.entries(byLoc).map(([l, a]) => `${locLabel(l)} : ${a.join(", ")}`).join(" · ")];
   }
   if (name === "update_pantry_item") {
     const it = (S.pantry || []).find((p) => p.id === x.id);

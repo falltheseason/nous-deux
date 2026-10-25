@@ -117,6 +117,9 @@ body.typing nav.tabs{display:none}
 .item.done .check{background:var(--ok);border-color:var(--ok);color:#fff}
 .itext{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35}
 .item.done .itext{color:var(--muted);text-decoration:line-through}
+.itext.editable{cursor:text;padding:4px 0;border-radius:6px}
+.itext.editable:active{background:var(--surface2)}
+.itedit{flex:1;min-width:0;padding:8px 10px;font-size:16px}
 .x{border:0;background:none;color:var(--muted);width:32px;height:32px;display:grid;place-items:center;border-radius:50%;flex:none}
 .x svg{width:18px;height:18px}
 .sect{display:flex;align-items:center;justify-content:space-between;margin-top:22px;color:var(--muted);font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
@@ -305,7 +308,10 @@ textarea.txt{resize:vertical;min-height:70px;font:inherit}
 .pan.empty-item{opacity:.55}
 .pmain{flex:1;min-width:0;border:0;background:none;text-align:left;padding:0;color:inherit}
 .pname{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:800;font-size:16px}
-.pname span:first-child{overflow-wrap:anywhere}
+.pname .pn{overflow-wrap:anywhere}
+.pcat{font-size:15px;margin-right:-2px}
+.chips.cats{padding-top:2px}
+.chips.cats .chip{padding:6px 11px;font-size:13px}
 .psub{font-size:13px;color:var(--muted);font-weight:700;margin-top:2px;overflow-wrap:anywhere}
 .exp{font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;white-space:nowrap}
 .exp.ok{background:var(--surface2);color:var(--muted)}
@@ -477,6 +483,7 @@ nav.tabs button{font-size:11px}
             <button class="btn small" id="btn-assist" aria-label="Assistant">✨ Assistant</button>
           </div>
           <div class="chips" id="pan-chips"></div>
+          <div class="chips cats hidden" id="pan-cats"></div>
           <div id="pan-list"></div>
         </div>
       </div>
@@ -1607,14 +1614,54 @@ function closeListNow() {
 }
 function closeList() { if (history.state?.l) history.back(); else closeListNow(); }
 
+// Correction d'un élément : on touche le texte, on corrige, Entrée (ou on touche ailleurs) pour garder
+let EditItem = null; // { id, draft, el, cancel }
 function itemRow(it) {
-  return h("div", { class: "item" + (it.done ? " done" : "") },
+  const editing = EditItem?.id === it.id;
+  let txt;
+  if (editing) {
+    txt = h("input", { class: "txt itedit", maxlength: "300", enterkeyhint: "done", "aria-label": "Corriger l'élément" });
+    txt.value = EditItem.draft;
+    EditItem.el = txt;
+    txt.oninput = () => { if (EditItem) EditItem.draft = txt.value; };
+    txt.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); txt.blur(); }
+      else if (e.key === "Escape") { if (EditItem) EditItem.cancel = true; txt.blur(); }
+    };
+    txt.onblur = () => finishItemEdit(it);
+    setTimeout(() => { txt.focus(); const n = txt.value.length; try { txt.setSelectionRange(n, n); } catch {} }, 0);
+  } else {
+    txt = h("span", { class: "itext editable", text: it.text, title: "Touche pour corriger", role: "button", tabindex: "0",
+      onclick: () => startItemEdit(it),
+      onkeydown: (e) => { if (e.key === "Enter") startItemEdit(it); } });
+  }
+  return h("div", { class: "item" + (it.done ? " done" : "") + (editing ? " editing" : "") },
     h("button", { class: "check", "aria-label": it.done ? "Décocher" : "Cocher",
       onclick: () => be.update("items", it.id, { done: !it.done }).catch(onErr) }, ICON.check()),
-    h("span", { class: "itext", text: it.text }),
-    h("button", { class: "x", "aria-label": "Supprimer", onclick: () => be.remove("items", it.id).catch(onErr) }, ICON.x()));
+    txt,
+    h("button", { class: "x", "aria-label": "Supprimer", onclick: () => { EditItem = null; be.remove("items", it.id).catch(onErr); } }, ICON.x()));
 }
-function renderListDetail() {
+function startItemEdit(it) {
+  if (EditItem) return;
+  EditItem = { id: it.id, draft: it.text };
+  renderListDetail(true);
+}
+async function finishItemEdit(it) {
+  if (!EditItem || EditItem.id !== it.id) return;
+  const { draft, cancel } = EditItem;
+  EditItem = null;
+  const text = draft.trim();
+  if (!cancel && text && text !== it.text) {
+    it.text = text; // affichage immédiat
+    try { await be.update("items", it.id, { e: await encJ({ text }) }); }
+    catch (e) { onErr(e); }
+  }
+  if (S.openList) renderListDetail(true);
+}
+function renderListDetail(force) {
+  // pendant une correction, on ne redessine pas (sinon le clavier se fermerait)
+  if (!force && EditItem?.el?.isConnected) return;
+  if (EditItem && !itemsOf(S.openList).some((i) => i.id === EditItem.id)) EditItem = null;
   const l = S.lists.find((x) => x.id === S.openList);
   $("#list-title").textContent = l?.title || "";
   const its = itemsOf(S.openList);
@@ -2141,7 +2188,44 @@ const DEFAULT_LOCS = [
   { id: "garde", name: "Garde-manger", emoji: "🥫" },
 ];
 const UNITS = ["", "g", "kg", "ml", "L", "paquet", "boîte", "sac", "pot", "bouteille", "portion"];
-const Pan = { loc: "all", q: "" };
+const Pan = { loc: "all", q: "", cat: "all" };
+const CATS = [
+  { id: "fruits", name: "Fruits et légumes", emoji: "🥬" },
+  { id: "viande", name: "Viandes, poissons et tofu", emoji: "🥩" },
+  { id: "laitier", name: "Produits laitiers et œufs", emoji: "🧀" },
+  { id: "pain", name: "Pains et boulangerie", emoji: "🍞" },
+  { id: "cereales", name: "Pâtes, riz et céréales", emoji: "🍝" },
+  { id: "conserves", name: "Conserves et sauces", emoji: "🥫" },
+  { id: "condiments", name: "Épices et condiments", emoji: "🧂" },
+  { id: "cuisson", name: "Cuisson et pâtisserie", emoji: "🧁" },
+  { id: "collations", name: "Collations et desserts", emoji: "🍪" },
+  { id: "boissons", name: "Boissons", emoji: "🥤" },
+  { id: "prets", name: "Plats préparés et restes", emoji: "🍲" },
+  { id: "autre", name: "Autre", emoji: "📦" },
+];
+const CAT_IDS = CATS.map((c) => c.id);
+const catInfo = (id) => CATS.find((c) => c.id === id) || CATS.at(-1);
+// Devine la catégorie à partir du nom (l'ordre compte : « jus d'orange » → boissons, pas fruits)
+const CAT_GUESS = [
+  ["prets", "restes?\\b|lasagne|pate chinois|pizza|soupe(?! en (conserve|boite|canne))|ragout|chili\\b|pain de viande|tourtiere|pate au poulet|repas|plats?\\b|sushi|burrito|quiche|frites|pogos?|croquettes|nuggets|cretons|pates? cuites?|sauce a spag"],
+  ["boissons", "jus\\b|boissons?|bieres?|vins?\\b|cidre|liqueur|cola\\b|pepsi|coke|eau\\b|cafe|the\\b|tisane|kombucha|limonade|lait au chocolat|gatorade|smoothie"],
+  ["cuisson", "farine|sucre|cassonade|levure|poudre a pate|bicarbonate|huiles?\\b|fecule|vanille|brisures|pepites|cacao|chapelure|graisse|shortening|gelatine|pate a tarte|pate feuilletee|pate a pizza"],
+  ["condiments", "epices?|sel\\b|poivre\\b|cannelle|cumin|paprika|origan|thym|curcuma|cari\\b|curry|assaisonnement|ketchup|moutarde|mayo|relish|vinaigre|vinaigrette|sauce (soya|soja|piquante|bbq|barbecue|worcestershire|sriracha|hoisin|poisson|teriyaki|tabasco)|sriracha|miel|sirop|confiture|beurre d.arachides?|nutella|tartinade|herbes salees|bouillon en poudre|poudre d.ail|poudre de chili"],
+  ["conserves", "conserves?|en boite|en canne|bouillon|pate de tomates?|tomates? (en des|broyees|en conserve)|sauce|lait de coco|thon|sardines?|cornichons?|olives?|salsa|pesto|haricots (rouges|noirs|blancs|au lard)|feves au lard"],
+  ["pain", "pains?\\b|baguettes?|bagels?|tortillas?|pitas?|naans?|croissants?|brioches?|muffins? anglais|wraps?\\b|craquelins|biscottes"],
+  ["collations", "croustilles|chips|biscuits?|chocolat|bonbons?|jujubes|popcorn|mais souffle|barres?\\b|noix|amandes|arachides|pistaches|cajou|graines|melange montagnard|gateau|muffins?|beignes?|tartes?\\b|creme glacee|creme glace|popsicle|dessert|pouding|jello|compote|galettes"],
+  ["laitier", "lait\\b|laits\\b|creme|fromages?|yogourt|yaourt|yogurt|beurre|oeufs?\\b|margarine|cheddar|mozzarella|parmesan|feta|ricotta|cottage|kefir|skyr|brie\\b|gouda|suisse"],
+  ["cereales", "pates?\\b|spaghett?i|macaroni|penne|fusilli|linguine|rotini|nouilles|vermicelles|riz\\b|quinoa|couscous|orge|avoine|gruau|cereales?|granola|muesli|lentilles|pois chiches|boulgour|polenta|semoule|ramen"],
+  ["viande", "poulet|boeuf|porc|veau|agneau|dinde|canard|jambon|bacon|saucisses?|saucisson|salami|pepperoni|steaks?|bifteck|filets?|cotelettes?|hache|viandes?|poissons?|saumon|truite|morue|tilapia|aiglefin|crevettes?|petoncles?|homard|crabe|moules|tofu|tempeh|hot.?dogs?|charcuteries?|prosciutto|chorizo|merguez|cuisses?|poitrines?|ailes|roti|bavette|surlonge|longe|cotes levees|flétan|fletan|sole\\b"],
+  ["fruits", "pommes?|poires?|bananes?|oranges?|clementines?|mandarines?|citrons?|limes?\\b|pamplemousses?|raisins?|fraises?|framboises?|bleuets?|mures?|canneberges?|cerises?|peches?|nectarines?|prunes?|abricots?|kiwis?|mangues?|ananas|melons?|cantaloup|pasteque|avocats?|tomates?|concombres?|laitues?|salades?|epinards?|kale|chou|brocolis?|carottes?|celeris?|oignons?|echalotes?|ail\\b|poireaux?|patates?|navets?|betteraves?|radis|courgettes?|zucchinis?|aubergines?|poivrons?|piments?|champignons?|mais\\b|haricots verts|pois\\b|asperges?|courges?|citrouilles?|gingembre|persil|coriandre|basilic|menthe|aneth|ciboulette|legumes?|fruits?|fines herbes|bok choy|roquette|edamame|rapini|panais|petits fruits"],
+].map(([id, re]) => [id, new RegExp("\\b(?:" + re + ")")]);
+const normName = (s) => String(s || "").toLowerCase().replace(/œ/g, "oe").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, "'");
+function guessCat(name) {
+  const n = normName(name);
+  for (const [id, re] of CAT_GUESS) if (re.test(n)) return id;
+  return "autre";
+}
+const catOf = (it) => CAT_IDS.includes(it.cat) ? it.cat : guessCat(it.name);
 const pantryLocs = () => S.pantryLocs?.length ? S.pantryLocs : DEFAULT_LOCS;
 const locOf = (id) => pantryLocs().find((l) => l.id === id) || { id, name: "Autre", emoji: "📦" };
 const decPantry = async (d) => d.e ? { id: d.id, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
@@ -2170,15 +2254,24 @@ function renderPantry() {
   const all = (S.pantry || []).filter((it) => !q || it.name.toLowerCase().includes(q) || (it.note || "").toLowerCase().includes(q));
   const chips = [{ id: "all", name: "Tout", emoji: "🏠" }, ...locs].map((l) => {
     const n = l.id === "all" ? (S.pantry || []).length : (S.pantry || []).filter((it) => it.loc === l.id).length;
-    return h("button", { class: "chip" + (Pan.loc === l.id ? " on" : ""), onclick: () => { Pan.loc = l.id; renderPantry(); } },
+    return h("button", { class: "chip" + (Pan.loc === l.id ? " on" : ""), onclick: () => { Pan.loc = l.id; Pan.cat = "all"; renderPantry(); } },
       `${l.emoji} ${l.name}`, n ? h("span", { class: "cnt", text: n }) : null);
   });
   chips.push(h("button", { class: "chip add", "aria-label": "Gérer les emplacements", onclick: manageLocs }, "＋"));
   const sortFn = (a, b) => ((daysLeft(a.exp) ?? 9999) - (daysLeft(b.exp) ?? 9999)) || a.name.localeCompare(b.name, "fr");
+  const byCat = (a, b) => (CAT_IDS.indexOf(catOf(a)) - CAT_IDS.indexOf(catOf(b))) || sortFn(a, b);
   const out = [];
-  const shown = Pan.loc === "all" ? all : all.filter((it) => it.loc === Pan.loc);
+  const inLoc = Pan.loc === "all" ? all : all.filter((it) => it.loc === Pan.loc);
+  // filtre par catégorie (seulement celles présentes)
+  const present = CATS.filter((c) => inLoc.some((it) => catOf(it) === c.id));
+  if (Pan.cat !== "all" && !present.some((c) => c.id === Pan.cat)) Pan.cat = "all";
+  const catChips = present.length > 1 || Pan.cat !== "all" ? [
+    h("button", { class: "chip" + (Pan.cat === "all" ? " on" : ""), onclick: () => { Pan.cat = "all"; renderPantry(); } }, "Toutes"),
+    ...present.map((c) => h("button", { class: "chip" + (Pan.cat === c.id ? " on" : ""), title: c.name, onclick: () => { Pan.cat = Pan.cat === c.id ? "all" : c.id; renderPantry(); } },
+      `${c.emoji} ${c.name}`, h("span", { class: "cnt", text: inLoc.filter((it) => catOf(it) === c.id).length })))] : [];
+  const shown = Pan.cat === "all" ? inLoc : inLoc.filter((it) => catOf(it) === Pan.cat);
   const soon = shown.filter((it) => { const n = daysLeft(it.exp); return n !== null && n <= 3 && Number(it.qty) > 0; }).sort(sortFn);
-  if (soon.length && !q) {
+  if (soon.length && !q && Pan.cat === "all") {
     out.push(h("div", { class: "evday", text: "⏰ À consommer bientôt" }));
     soon.forEach((it) => out.push(pantryRow(it, true)));
   }
@@ -2186,27 +2279,37 @@ function renderPantry() {
     out.push(h("div", { class: "empty" }, h("div", { class: "big", text: q ? "🔎" : "🧺" }),
       h("p", { text: q ? "Rien trouvé." : "Rien ici pour l'instant. Ajoutez ce que vous avez avec le bouton +." })));
   } else if (Pan.loc === "all") {
+    // par emplacement, puis rangé par catégorie à l'intérieur
     for (const l of [...locs, { id: "__autre", name: "Autre", emoji: "📦" }]) {
-      const list = shown.filter((it) => l.id === "__autre" ? !locs.some((x) => x.id === it.loc) : it.loc === l.id).sort(sortFn);
+      const list = shown.filter((it) => l.id === "__autre" ? !locs.some((x) => x.id === it.loc) : it.loc === l.id).sort(byCat);
       if (!list.length) continue;
       out.push(h("div", { class: "evday", text: `${l.emoji} ${l.name} · ${list.length}` }));
+      list.forEach((it) => out.push(pantryRow(it, false, Pan.cat === "all")));
+    }
+  } else if (Pan.cat === "all") {
+    // un seul emplacement : sections par catégorie
+    for (const c of present) {
+      const list = shown.filter((it) => catOf(it) === c.id).sort(sortFn);
+      out.push(h("div", { class: "evday", text: `${c.emoji} ${c.name} · ${list.length}` }));
       list.forEach((it) => out.push(pantryRow(it)));
     }
   } else {
-    out.push(h("div", { class: "evday", text: `${shown.length} article${shown.length > 1 ? "s" : ""}` }));
+    out.push(h("div", { class: "evday", text: `${catInfo(Pan.cat).emoji} ${catInfo(Pan.cat).name} · ${shown.length}` }));
     shown.sort(sortFn).forEach((it) => out.push(pantryRow(it)));
   }
   $("#pan-chips").replaceChildren(...chips);
+  $("#pan-cats").replaceChildren(...catChips);
+  $("#pan-cats").classList.toggle("hidden", !catChips.length);
   $("#pan-list").replaceChildren(...out);
 }
-function pantryRow(it, showLoc) {
+function pantryRow(it, showLoc, showCat) {
   const empty = Number(it.qty) <= 0;
   const frozen = it.loc === "congelo" && it.createdAt ? Math.floor((Date.now() - it.createdAt) / (7 * 864e5)) : null;
   const sub = [showLoc ? `${locOf(it.loc).emoji} ${locOf(it.loc).name}` : null, it.note || null,
     frozen !== null && frozen >= 1 ? `congelé il y a ${frozen} sem.` : null].filter(Boolean).join(" · ");
   return h("div", { class: "pan" + (empty ? " empty-item" : "") },
     h("button", { class: "pmain", onclick: () => pantryForm(it) },
-      h("div", { class: "pname" }, h("span", { text: it.name }), expBadge(it)),
+      h("div", { class: "pname" }, showCat ? h("span", { class: "pcat", title: catInfo(catOf(it)).name, text: catInfo(catOf(it)).emoji }) : null, h("span", { class: "pn", text: it.name }), expBadge(it)),
       sub ? h("div", { class: "psub", text: sub }) : null),
     h("div", { class: "qty" },
       h("button", { class: "qbtn", "aria-label": "Moins", onclick: () => changeQty(it, -1) }, "−"),
@@ -2250,6 +2353,7 @@ function pantryForm(it) {
     qty: h("input", { class: "txt", type: "number", inputmode: "decimal", min: "0", step: "any" }),
     unit: h("select", { class: "txt" }, ...UNITS.map((u) => h("option", { value: u, text: u || "unité(s)" }))),
     loc: h("select", { class: "txt" }, ...pantryLocs().map((l) => h("option", { value: l.id, text: `${l.emoji} ${l.name}` }))),
+    cat: h("select", { class: "txt" }, ...CATS.map((c) => h("option", { value: c.id, text: `${c.emoji} ${c.name}` }))),
     exp: h("input", { class: "txt", type: "date" }),
     note: h("input", { class: "txt", maxlength: "200", placeholder: "Optionnel (marque, restants de mardi…)" }),
   };
@@ -2261,6 +2365,16 @@ function pantryForm(it) {
   f.loc.value = it?.loc || (Pan.loc !== "all" ? Pan.loc : pantryLocs()[0].id);
   f.exp.value = it?.exp || "";
   f.note.value = it?.note || "";
+  // catégorie : devinée d'après le nom tant qu'on ne l'a pas choisie soi-même
+  let catTouched = !!(it && CAT_IDS.includes(it.cat));
+  f.cat.value = it ? catOf(it) : (Pan.cat !== "all" ? Pan.cat : "autre");
+  if (!it && Pan.cat !== "all") catTouched = true;
+  f.cat.onchange = () => { catTouched = true; };
+  f.name.addEventListener("input", () => {
+    if (catTouched) return;
+    const known = (S.pantry || []).find((x) => x.name.toLowerCase() === f.name.value.trim().toLowerCase());
+    f.cat.value = known ? catOf(known) : guessCat(f.name.value);
+  });
   const quick = h("div", { class: "rowbtns", style: "justify-content:flex-start" },
     ...[["+3 j", 3], ["+1 sem.", 7], ["+1 mois", 30], ["+3 mois", 90], ["+6 mois", 182]].map(([t, d]) =>
       h("button", { type: "button", class: "chip", text: t, onclick: () => { f.exp.value = ymd(addDays(startOfDay(new Date()), d)); } })),
@@ -2270,14 +2384,14 @@ function pantryForm(it) {
     const name = f.name.value.trim();
     if (!name) { f.name.focus(); toast("Donne un nom à l'article"); return; }
     const qty = Math.max(0, Number(String(f.qty.value).replace(",", ".")) || 0);
-    const data = { name, qty, unit: f.unit.value, loc: f.loc.value, exp: f.exp.value || "", note: f.note.value.trim() };
+    const data = { name, qty, unit: f.unit.value, loc: f.loc.value, cat: f.cat.value, exp: f.exp.value || "", note: f.note.value.trim() };
     save.disabled = true;
     try {
       if (it) await savePantry(it, data);
       else {
         // même article au même endroit, même date : on additionne
         const same = (S.pantry || []).find((x) => x.name.toLowerCase() === name.toLowerCase() && x.loc === data.loc && (x.unit || "") === data.unit && (x.exp || "") === data.exp);
-        if (same) await savePantry(same, { qty: Math.round((Number(same.qty) + qty) * 100) / 100 });
+        if (same) await savePantry(same, { qty: Math.round((Number(same.qty) + qty) * 100) / 100, cat: data.cat });
         else await be.set("pantry", be.newId("pantry"), { e: await encJ(data), by: S.me.uid, createdAt: be.ts() });
       }
       closeSheet();
@@ -2297,7 +2411,7 @@ function pantryForm(it) {
     dl,
     h("label", { class: "field" }, "Article", f.name),
     h("div", { class: "two" }, h("label", { class: "field" }, "Quantité", f.qty), h("label", { class: "field" }, "Unité", f.unit)),
-    h("label", { class: "field" }, "Où", f.loc),
+    h("div", { class: "two" }, h("label", { class: "field" }, "Où", f.loc), h("label", { class: "field" }, "Catégorie", f.cat)),
     h("label", { class: "field" }, "Meilleur avant / à consommer avant", f.exp),
     quick,
     h("label", { class: "field" }, "Note", f.note)), foot);
@@ -2348,9 +2462,10 @@ const AS_TOOLS = [
       name: { type: "string", description: "Nom court, en français, première lettre majuscule (ex. « Lait 2 % »)" },
       qty: { type: "number" }, unit: { type: "string", enum: UNITS },
       loc: { type: "string", description: "id de l'emplacement" },
+      cat: { type: "string", enum: CAT_IDS, description: "catégorie de l'aliment" },
       exp: { type: "string", description: "Date AAAA-MM-JJ, seulement si connue" }, note: { type: "string" } } } } } } },
-  { name: "update_pantry_item", description: "Modifie un article existant (par son id) : quantité, unité, emplacement, date, nom ou note. qty = 0 garde l'article à zéro.",
-    input_schema: { type: "object", required: ["id"], properties: { id: { type: "string" }, name: { type: "string" }, qty: { type: "number" }, unit: { type: "string", enum: UNITS }, loc: { type: "string" }, exp: { type: "string" }, note: { type: "string" } } } },
+  { name: "update_pantry_item", description: "Modifie un article existant (par son id) : quantité, unité, emplacement, catégorie, date, nom ou note. qty = 0 garde l'article à zéro.",
+    input_schema: { type: "object", required: ["id"], properties: { id: { type: "string" }, name: { type: "string" }, qty: { type: "number" }, unit: { type: "string", enum: UNITS }, loc: { type: "string" }, cat: { type: "string", enum: CAT_IDS }, exp: { type: "string" }, note: { type: "string" } } } },
   { name: "remove_pantry_items", description: "Retire complètement des articles de l'inventaire (par leurs id).",
     input_schema: { type: "object", required: ["ids"], properties: { ids: { type: "array", items: { type: "string" } } } } },
   { name: "add_to_grocery_list", description: "Ajoute des articles à la liste d'épicerie partagée.",
@@ -2371,6 +2486,7 @@ Chaque message de l'usager commence par un bloc <contexte> qui contient l'état 
 
 RÈGLES :
 - Quand on te dicte ce qu'on a (« on a 2 litres de lait… »), utilise add_pantry_items tout de suite, sans demander confirmation. Choisis l'emplacement le plus logique (produits laitiers, restes, fruits et légumes frais → frigo ; ce qui est dit « au congélo » ou congelé → congélo ; conserves, pâtes, riz, céréales, épices, oignons, patates → garde-manger) sauf si on le précise.
+- Donne toujours une catégorie (cat) à chaque article : ${CATS.map((c) => `${c.id} = ${c.name}`).join(" ; ")}. Si on te demande de changer la catégorie d'un article, utilise update_pantry_item.
 - Unités permises : ${UNITS.filter(Boolean).join(", ")}, ou "" pour des unités (ex. 12 œufs → qty 12, unit ""). Une douzaine = 12.
 - Si on dit qu'on a maintenant une certaine quantité d'un article déjà présent, utilise update_pantry_item (avec son id) plutôt que d'en créer un deuxième.
 - N'invente pas de date de péremption ; mets-en une seulement si on la donne.
@@ -2383,7 +2499,7 @@ RÈGLES :
 // État à jour, joint à chaque message de l'usager
 function asContext() {
   const now = new Date();
-  const inv = (S.pantry || []).map((it) => `${it.id} | ${it.name} | ${it.qty} | ${it.unit || "unité"} | ${it.loc} | ${it.exp || "-"} | ${it.note || ""}`).join("\n") || "(vide)";
+  const inv = (S.pantry || []).map((it) => `${it.id} | ${it.name} | ${it.qty} | ${it.unit || "unité"} | ${it.loc} | ${catOf(it)} | ${it.exp || "-"} | ${it.note || ""}`).join("\n") || "(vide)";
   const g = S.lists.find((l) => /[ée]picerie/i.test(l.title));
   const groc = g ? itemsOf(g.id).filter((i) => !i.done).map((i) => "- " + i.text).join("\n") || "(vide)" : "(pas de liste)";
   const soon = (S.events || []).filter((e) => e.end > now && e.start < addDays(now, 14)).sort((a, b) => a.start - b.start)
@@ -2392,7 +2508,7 @@ function asContext() {
 Maintenant : ${now.toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "long" })} (${ymd(now)}), ${hm(now)}
 EMPLACEMENTS (id = nom) :
 ${pantryLocs().map((l) => `${l.id} = ${l.emoji} ${l.name}`).join("\n")}
-INVENTAIRE (id | article | quantité | unité | emplacement | meilleur avant | note) :
+INVENTAIRE (id | article | quantité | unité | emplacement | catégorie | meilleur avant | note) :
 ${inv}
 LISTE D'ÉPICERIE (à acheter) :
 ${groc}
@@ -2521,11 +2637,13 @@ async function asRunTool(name, x) {
   const locIds = new Set(pantryLocs().map((l) => l.id));
   const fixLoc = (l) => locIds.has(l) ? l : pantryLocs()[0].id;
   const fixUnit = (u) => UNITS.includes(u || "") ? (u || "") : "";
+  const fixCat = (c, nm) => CAT_IDS.includes(c) ? c : guessCat(nm);
   const fixDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "") ? d : "";
   if (name === "add_pantry_items") {
     const done = [];
     for (const raw of x.items || []) {
       const data = { name: String(raw.name || "").trim().slice(0, 120), qty: Math.max(0, Number(raw.qty) || 0), unit: fixUnit(raw.unit), loc: fixLoc(raw.loc), exp: fixDate(raw.exp), note: String(raw.note || "").slice(0, 200) };
+      data.cat = fixCat(raw.cat, data.name);
       if (!data.name) continue;
       const same = (S.pantry || []).find((it) => it.name.toLowerCase() === data.name.toLowerCase() && it.loc === data.loc && (it.unit || "") === data.unit && (it.exp || "") === data.exp);
       if (same) { await savePantry(same, { qty: Math.round((Number(same.qty) + data.qty) * 100) / 100 }); same.qty = Number(same.qty) + data.qty; }
@@ -2548,6 +2666,7 @@ async function asRunTool(name, x) {
     if (x.qty !== undefined) patch.qty = Math.max(0, Number(x.qty) || 0);
     if (x.unit !== undefined) patch.unit = fixUnit(x.unit);
     if (x.loc) patch.loc = fixLoc(x.loc);
+    if (x.cat) patch.cat = fixCat(x.cat, x.name || it.name);
     if (x.exp !== undefined) patch.exp = fixDate(x.exp);
     if (x.note !== undefined) patch.note = String(x.note).slice(0, 200);
     await savePantry(it, patch);

@@ -120,6 +120,11 @@ body.typing nav.tabs{display:none}
 .itext.editable{cursor:text;padding:4px 0;border-radius:6px}
 .itext.editable:active{background:var(--surface2)}
 .itedit{flex:1;min-width:0;padding:8px 10px;font-size:16px}
+.itext.noname{color:var(--muted);font-style:italic}
+.ithumb{flex:none;width:46px;height:46px;border-radius:10px;border:0;padding:0;overflow:hidden;background:var(--surface2)}
+.ithumb img{width:100%;height:100%;object-fit:cover;display:block}
+.item.done .ithumb{opacity:.5}
+.itemphoto{display:block;width:100%;max-height:62vh;object-fit:contain;border-radius:14px;background:var(--surface2)}
 .x{border:0;background:none;color:var(--muted);width:32px;height:32px;display:grid;place-items:center;border-radius:50%;flex:none}
 .x svg{width:18px;height:18px}
 .sect{display:flex;align-items:center;justify-content:space-between;margin-top:22px;color:var(--muted);font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
@@ -455,6 +460,7 @@ nav.tabs button{font-size:11px}
         <div class="pad" style="padding-top:0">
           <form class="addrow" id="new-item">
             <input class="txt" id="new-item-input" placeholder="Ajouter un élément" maxlength="200" autocomplete="off">
+            <button class="iconbtn" type="button" id="btn-item-photo" aria-label="Ajouter avec une photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
             <button class="iconbtn send" type="submit" aria-label="Ajouter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
           </form>
           <div class="items" id="items-todo"></div>
@@ -503,6 +509,7 @@ nav.tabs button{font-size:11px}
         <div id="photos-empty" class="empty hidden"><div class="big">📷</div><p>Votre album commun est vide.<br>Ajoutez vos premiers souvenirs.</p></div>
       </div>
       <input type="file" id="photo-files" accept="image/*" multiple class="hidden">
+      <input type="file" id="item-file" accept="image/*" class="hidden">
     </section>
   </main>
 
@@ -630,6 +637,7 @@ const ICON = {
   check: () => svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 'fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"'),
   x: () => svg('<path d="M7 7l10 10M17 7L7 17"/>'),
   chev: () => svg('<path d="M9 5l7 7-7 7"/>'),
+  camera: () => svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'),
   lock: () => svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 'width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"'),
   back: () => svg('<path d="M14 7l-5 5 5 5M20 12H9"/>', 'width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"'),
 };
@@ -1348,7 +1356,18 @@ async function decMessage(d) {
   return m;
 }
 const decList = async (d) => d.e ? { id: d.id, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
-const decItem = async (d) => d.e ? { id: d.id, listId: d.listId, done: !!d.done, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) } : null;
+const itemThumbs = new Map(); // photo id → Promise<url>
+async function decItem(d) {
+  if (!d.e) return null;
+  const it = { id: d.id, listId: d.listId, done: !!d.done, by: d.by, createdAt: d.createdAt, ...(await decJ(d.e)) };
+  if (it.ph && d.t) {
+    if (!itemThumbs.has(it.ph)) itemThumbs.set(it.ph, decBlob(d.t).then((b) => URL.createObjectURL(b)));
+    try { it.thumb = await itemThumbs.get(it.ph); } catch (e) { itemThumbs.delete(it.ph); console.error(e); }
+  }
+  return it;
+}
+// retirer un élément = retirer aussi sa photo
+const itemPairs = (its) => its.flatMap((i) => i.ph ? [["items", i.id], ["photosFull", i.ph]] : [["items", i.id]]);
 async function decPhoto(d) {
   if (!d.t) return null;
   if (!thumbCache.has(d.id)) thumbCache.set(d.id, decBlob(d.t).then((b) => URL.createObjectURL(b)));
@@ -1631,32 +1650,40 @@ function itemRow(it) {
     txt.onblur = () => finishItemEdit(it);
     setTimeout(() => { txt.focus(); const n = txt.value.length; try { txt.setSelectionRange(n, n); } catch {} }, 0);
   } else {
-    txt = h("span", { class: "itext editable", text: it.text, title: "Touche pour corriger", role: "button", tabindex: "0",
+    txt = h("span", { class: "itext editable" + (it.text ? "" : " noname"), text: it.text || (it.ph ? "Photo" : ""), title: "Touche pour corriger", role: "button", tabindex: "0",
       onclick: () => startItemEdit(it),
       onkeydown: (e) => { if (e.key === "Enter") startItemEdit(it); } });
   }
+  const thumb = it.ph ? h("button", { class: "ithumb", "aria-label": "Voir la photo", onclick: () => openItemPhoto(it) },
+    it.thumb ? h("img", { src: it.thumb, alt: "" }) : null) : null;
+  const camBtn = editing ? h("button", { class: "x", type: "button", "aria-label": it.ph ? "Remplacer la photo" : "Ajouter une photo",
+    onmousedown: (e) => e.preventDefault(), onclick: () => pickItemPhoto(it.id) }, ICON.camera()) : null;
   return h("div", { class: "item" + (it.done ? " done" : "") + (editing ? " editing" : "") },
     h("button", { class: "check", "aria-label": it.done ? "Décocher" : "Cocher",
       onclick: () => be.update("items", it.id, { done: !it.done }).catch(onErr) }, ICON.check()),
-    txt,
-    h("button", { class: "x", "aria-label": "Supprimer", onclick: () => { EditItem = null; be.remove("items", it.id).catch(onErr); } }, ICON.x()));
+    thumb, txt, camBtn,
+    h("button", { class: "x", "aria-label": "Supprimer", onclick: () => { EditItem = null; be.removeMany(itemPairs([it])).catch(onErr); } }, ICON.x()));
 }
 function startItemEdit(it) {
   if (EditItem) return;
-  EditItem = { id: it.id, draft: it.text };
+  EditItem = { id: it.id, draft: it.text || "" };
   renderListDetail(true);
 }
 async function finishItemEdit(it) {
   if (!EditItem || EditItem.id !== it.id) return;
-  const { draft, cancel } = EditItem;
+  const { draft, cancel, el } = EditItem;
   EditItem = null;
   const text = draft.trim();
-  if (!cancel && text && text !== it.text) {
+  it = S.items.find((i) => i.id === it.id) || it; // version la plus récente (ex. photo ajoutée pendant la correction)
+  if (!cancel && (text || it.ph) && text !== (it.text || "")) {
     it.text = text; // affichage immédiat
-    try { await be.update("items", it.id, { e: await encJ({ text }) }); }
+    try { await be.update("items", it.id, { e: await encJ({ text, ...(it.ph ? { ph: it.ph } : {}) }) }); }
     catch (e) { onErr(e); }
   }
-  if (S.openList) renderListDetail(true);
+  // on remplace seulement cette rangée, pour qu'un toucher sur un autre élément ne soit pas perdu
+  const row = el?.closest(".item");
+  if (row?.isConnected) row.replaceWith(itemRow(it));
+  setTimeout(() => { if (S.openList) renderListDetail(); }, 350);
 }
 function renderListDetail(force) {
   // pendant une correction, on ne redessine pas (sinon le clavier se fermerait)
@@ -1696,6 +1723,71 @@ $("#new-item").onsubmit = async (e) => {
 };
 $("#new-item").querySelector("button").addEventListener("mousedown", (e) => e.preventDefault());
 $("#btn-list-back").onclick = closeList;
+
+/* Photos dans les listes (ex. la bonne marque à acheter). Chiffrées, hors de l'album. */
+let itemPhotoTarget = null; // null = nouvel élément, sinon id de l'élément
+function pickItemPhoto(itemId) { itemPhotoTarget = itemId; $("#item-file").click(); }
+$("#btn-item-photo").onclick = () => pickItemPhoto(null);
+$("#btn-item-photo").addEventListener("mousedown", (e) => e.preventDefault());
+$("#item-file").onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  const target = itemPhotoTarget; itemPhotoTarget = null;
+  if (!f || !KEY || !S.openList) return;
+  toast("Chiffrement de la photo…", 0);
+  try {
+    const { full, thumb } = await compress(f);
+    const ph = be.newId("photosFull");
+    await be.set("photosFull", ph, { d: await encBlob(full.blob) });
+    const t = await encBlob(thumb.blob);
+    if (target) {
+      const it = S.items.find((i) => i.id === target);
+      if (!it) { await be.remove("photosFull", ph); hideToast(); return; }
+      const old = it.ph;
+      await be.update("items", it.id, { e: await encJ({ text: it.text || "", ph }), t });
+      if (old) be.remove("photosFull", old).catch(() => {});
+      toast("Photo ajoutée");
+    } else {
+      const inp = $("#new-item-input");
+      const text = inp.value.trim();
+      inp.value = "";
+      await be.set("items", be.newId("items"), { listId: S.openList, e: await encJ({ text, ph }), t, done: false, by: S.me.uid, createdAt: be.ts() });
+      toast(text ? `« ${text} » ajouté avec sa photo` : "Photo ajoutée — touche « Photo » pour lui donner un nom");
+    }
+  } catch (err) { hideToast(); onErr(err); }
+};
+async function openItemPhoto(it) {
+  const img = h("img", { class: "itemphoto", src: it.thumb || "", alt: it.text || "Photo" });
+  let blob = null;
+  const save = h("button", { class: "btn ghost small", text: "⬇️ Enregistrer", onclick: () => saveImage(blob, `${(it.text || "photo").slice(0, 40)}.jpg`, it.thumb) });
+  const foot = [
+    h("button", { class: "btn danger small", text: "Retirer", onclick: async () => {
+      if (!confirm("Retirer la photo de cet élément?")) return;
+      closeSheet();
+      try {
+        await be.update("items", it.id, { e: await encJ({ text: it.text || "Photo" }), t: null });
+        await be.remove("photosFull", it.ph);
+      } catch (e) { onErr(e); }
+    } }),
+    h("button", { class: "btn ghost small", text: "📷 Remplacer", onclick: () => { closeSheet(); pickItemPhoto(it.id); } }),
+    save,
+  ];
+  openSheet(it.text || "Photo", img, foot);
+  try {
+    const f = await be.get("photosFull", it.ph);
+    if (f?.d) { blob = await decBlob(f.d); if (img.isConnected) { const u = URL.createObjectURL(blob); img.onload = () => setTimeout(() => URL.revokeObjectURL(u), 1000); img.src = u; } }
+  } catch (e) { console.error(e); }
+}
+async function saveImage(blob, name, fallbackURL) {
+  try {
+    blob ||= await (await fetch(fallbackURL)).blob();
+    const file = new File([blob], name, { type: "image/jpeg" });
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file] }); return; }
+    const url = URL.createObjectURL(blob);
+    const a = h("a", { href: url, download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) { if (e.name !== "AbortError") toast("Impossible d'enregistrer la photo"); }
+}
 $("#list-title").onclick = async () => {
   const l = S.lists.find((x) => x.id === S.openList);
   const t = prompt("Renommer la liste", l?.title || "");
@@ -1704,13 +1796,13 @@ $("#list-title").onclick = async () => {
 $("#btn-list-del").onclick = () => {
   const l = S.lists.find((x) => x.id === S.openList);
   if (!l || !confirm(`Supprimer la liste « ${l.title} » et tout son contenu?`)) return;
-  const pairs = [...itemsOf(l.id).map((i) => ["items", i.id]), ["lists", l.id]];
+  const pairs = [...itemPairs(itemsOf(l.id)), ["lists", l.id]];
   closeList();
   be.removeMany(pairs).catch(onErr);
 };
 $("#btn-clear-done").onclick = () => {
   const done = itemsOf(S.openList).filter((i) => i.done);
-  if (done.length) be.removeMany(done.map((i) => ["items", i.id])).catch(onErr);
+  if (done.length) be.removeMany(itemPairs(done)).catch(onErr);
 };
 
 /* ============================================================
@@ -2342,7 +2434,7 @@ async function addToGrocery(name, quiet) {
     list = newGroceryList = { id, title: "Épicerie" };
     await be.set("lists", id, { e: await encJ({ title: "Épicerie" }), by: S.me.uid, createdAt: be.ts() });
   }
-  const exists = itemsOf(list.id).some((i) => !i.done && i.text.trim().toLowerCase() === name.trim().toLowerCase());
+  const exists = itemsOf(list.id).some((i) => !i.done && (i.text || "").trim().toLowerCase() === name.trim().toLowerCase());
   if (!exists) await be.set("items", be.newId("items"), { listId: list.id, e: await encJ({ text: name }), done: false, by: S.me.uid, createdAt: be.ts() });
   if (!quiet) toast(exists ? `« ${name} » est déjà sur la liste « ${list.title} »` : `« ${name} » ajouté à la liste « ${list.title} » 🛒`);
 }
@@ -2501,7 +2593,7 @@ function asContext() {
   const now = new Date();
   const inv = (S.pantry || []).map((it) => `${it.id} | ${it.name} | ${it.qty} | ${it.unit || "unité"} | ${it.loc} | ${catOf(it)} | ${it.exp || "-"} | ${it.note || ""}`).join("\n") || "(vide)";
   const g = S.lists.find((l) => /[ée]picerie/i.test(l.title));
-  const groc = g ? itemsOf(g.id).filter((i) => !i.done).map((i) => "- " + i.text).join("\n") || "(vide)" : "(pas de liste)";
+  const groc = g ? itemsOf(g.id).filter((i) => !i.done).map((i) => "- " + (i.text || "(photo)")).join("\n") || "(vide)" : "(pas de liste)";
   const soon = (S.events || []).filter((e) => e.end > now && e.start < addDays(now, 14)).sort((a, b) => a.start - b.start)
     .map((e) => `- ${ymd(e.start)} ${e.allDay ? "(journée)" : hm(e.start)} : ${e.title}`).join("\n") || "(rien)";
   return `<contexte>

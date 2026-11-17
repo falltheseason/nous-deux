@@ -1,0 +1,1 @@
+Clé de signature de l’app Android, chiffrée (AES-256).

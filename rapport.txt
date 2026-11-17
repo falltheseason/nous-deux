@@ -1,0 +1,130 @@
+Exécution 44166122041 — Tue Nov 17 20:10:56 UTC 2026 — résultat : success
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated json-ptr@3.1.1: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+
+[1m[37m===[39m Deploying to 'nous-2-48a67'...[22m
+
+[36m[1mi [22m[39m deploying [1mfunctions[22m
+[36m[1mi  functions:[22m[39m preparing codebase [1mdefault[22m for deployment
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudfunctions.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudbuild.googleapis.com[22m is enabled...
+[36m[1mi  artifactregistry:[22m[39m ensuring required API [1martifactregistry.googleapis.com[22m is enabled...
+[32m[1m✔  artifactregistry:[22m[39m required API [1martifactregistry.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1mcloudfunctions.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1mcloudbuild.googleapis.com[22m is enabled
+[36m[1mi [22m[39m [36m[1mfunctions: [22m[39mLoaded environment variables from functions/.env
+[36m[1mi  functions:[22m[39m Loading and analyzing source code for codebase default to determine what to deploy
+Serving at port 8576
+
+[36m[1mi  extensions:[22m[39m ensuring required API [1mfirebaseextensions.googleapis.com[22m is enabled...
+[32m[1m✔  extensions:[22m[39m required API [1mfirebaseextensions.googleapis.com[22m is enabled
+[36m[1mi [22m[39m [36m[1mfunctions: [22m[39mLoaded environment variables from functions/.env
+[36m[1mi  functions:[22m[39m preparing [1mfunctions[22m directory for uploading...
+[36m[1mi [22m[39m [36m[1mfunctions:[22m[39m packaged [1m/home/runner/work/nous-deux/nous-deux/functions[22m (35.52 KB) for uploading
+[36m[1mi  functions:[22m[39m ensuring required API [1mrun.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1meventarc.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mpubsub.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mstorage.googleapis.com[22m is enabled...
+[32m[1m✔  functions:[22m[39m required API [1meventarc.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1mrun.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1mpubsub.googleapis.com[22m is enabled
+[32m[1m✔  functions:[22m[39m required API [1mstorage.googleapis.com[22m is enabled
+[36m[1mi  functions:[22m[39m generating the service identity for [1mpubsub.googleapis.com[22m...
+[36m[1mi  functions:[22m[39m generating the service identity for [1meventarc.googleapis.com[22m...
+[32m[1m✔  functions:[22m[39m [1mfunctions[22m source uploaded successfully
+[36m[1mi  functions:[22m[39m creating Node.js 22 (2nd Gen) function [1mnotifierElement(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mnotifierMessage(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mnotifierEvenement(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mnotifierAppel(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mtesterNotification(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1mturnCredentials(northamerica-northeast1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 22 (2nd Gen) function [1massistant(northamerica-northeast1)[22m...
+[32m[1m✔ [22m[39m [1m[32mfunctions[notifierAppel(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[turnCredentials(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[notifierMessage(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[testerNotification(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[assistant(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[notifierEvenement(northamerica-northeast1)][39m[22m Successful update operation.
+[32m[1m✔ [22m[39m [1m[32mfunctions[notifierElement(northamerica-northeast1)][39m[22m Successful create operation.
+
+[32m[1m✔ [22m[39m [1m[4mDeploy complete![24m[22m
+
+[1mProject Console:[22m https://console.firebase.google.com/project/nous-2-48a67/overview
+=== Assistant (clé Anthropic) ===
+HTTP 200
+"id":"claude-sonnet-5-5"
+1er appel : tool_use | blocs : thinking,tool_use
+2e appel : end_turn | C'est fait : 5 oignons moyens ajoutés à la garde.
+ASSISTANT OK
+=== Relais d'appels Cloudflare ===
+HTTP 201
+"urls":["stun:stun.cloudflare.com:3478","stun:stun.cloudflare.com:443"]
+"urls":["turn:turn.cloudflare.com:3478?transport=udp","turn:turn.cloudflare.com:3478?transport=tcp","turns:turn.cloudflare.com:5349?transport=tcp","turn:turn.cloudflare.com:443?transport=udp","turn:turn.cloudflare.com:80?transport=tcp","turns:turn.cloudflare.com:443?transport=tcp"]
+=== Fonctions installées ===
+NAME                STATE   ENVIRONMENT  LOCATION
+assistant           ACTIVE  GEN_2
+notifierAppel       ACTIVE  GEN_2
+notifierElement     ACTIVE  GEN_2
+notifierEvenement   ACTIVE  GEN_2
+notifierMessage     ACTIVE  GEN_2
+testerNotification  ACTIVE  GEN_2
+turnCredentials     ACTIVE  GEN_2
+=== Base Firestore ===
+ND_REGION=northamerica-northeast1
+CF_TURN_KEY_ID=(présent)
+=== Déclencheurs Eventarc ===
+NAME                       TYPE                                        DESTINATION                          ACTIVE  LOCATION
+notifiermessage-006825     google.cloud.firestore.document.v1.created  Cloud Functions: notifierMessage     Yes     northamerica-northeast1
+notifierappel-632219       google.cloud.firestore.document.v1.created  Cloud Functions: notifierAppel       Yes     northamerica-northeast1
+testernotification-070379  google.cloud.firestore.document.v1.created  Cloud Functions: testerNotification  Yes     northamerica-northeast1
+notifierelement-498678     google.cloud.firestore.document.v1.created  Cloud Functions: notifierElement     Yes     northamerica-northeast1
+notifierevenement-283909   google.cloud.firestore.document.v1.created  Cloud Functions: notifierEvenement   Yes     northamerica-northeast1
+=== Base Firestore (détails) ===
+databaseEdition: STANDARD
+locationId: northamerica-northeast1
+type: FIRESTORE_NATIVE
+=== Rôles du compte de calcul ===
+roles/cloudbuild.builds.builder
+roles/editor
+roles/eventarc.eventReceiver
+roles/run.invoker
+=== Journal assistant ===
+LEVEL  NAME       EXECUTION_ID  TIME_UTC                 LOG
+I      assistant                2026-11-17 20:10:24.202  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      assistant                2026-11-17 20:10:21.592  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+=== Journal turnCredentials ===
+LEVEL  NAME             EXECUTION_ID  TIME_UTC                 LOG
+I      turncredentials                2026-11-17 20:10:29.637  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-11-17 20:10:27.293  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+D      turncredentials  kyzn14j305yf  2026-11-17 17:32:18.269  Callable request verification passed
+I      turncredentials                2026-11-17 17:32:18.105
+I      turncredentials                2026-11-17 17:32:17.882  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-11-17 17:32:14.874  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      turncredentials                2026-11-17 17:32:14.841
+D      turncredentials  k20cysf20yq2  2026-11-17 02:09:04.536  Callable request verification passed
+I      turncredentials                2026-11-17 02:09:04.395
+I      turncredentials                2026-11-17 02:09:04.272  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-11-17 02:09:01.063  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      turncredentials                2026-11-17 02:09:01.018
+D      turncredentials  i5kef9edotyq  2026-11-15 18:13:06.015  Callable request verification passed
+I      turncredentials                2026-11-15 18:13:05.910
+I      turncredentials                2026-11-15 18:13:05.742  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-11-15 18:13:03.846  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      turncredentials                2026-11-15 18:13:03.836
+D      turncredentials  i50k4ats74ws  2026-11-15 17:57:40.284  Callable request verification passed
+I      turncredentials                2026-11-15 17:57:40.162
+I      turncredentials                2026-11-15 17:57:40.098
+I      turncredentials                2026-11-15 17:53:16.367  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-11-15 17:53:14.092  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+D      turncredentials  i4urq8wuzchx  2026-11-15 17:53:10.206  Callable request verification passed
+I      turncredentials                2026-11-15 17:53:10.091
+I      turncredentials                2026-11-15 17:53:09.896  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      turncredentials                2026-11-15 17:53:07.958  Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+I      turncredentials                2026-11-15 17:53:07.872
+=== Journal notifierAppel ===
+LEVEL  NAME           EXECUTION_ID  TIME_UTC                 LOG
+I      notifierappel                2026-11-17 20:10:29.285  Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+I      notifierappel                2026-11-17 20:10:27.193  Starting new instance. Reason: DEPLOYMENT_ROLLOUT - Instance started due to traffic shifting between revisions due to deployment, traffic split adjustment, or deployment health check.
+=== Journal Eventarc / Cloud Run (erreurs) ===

@@ -36,7 +36,13 @@ jobs:
         with:
           node-version: 22
 
-      - uses: android-actions/setup-android@v3
+      - name: Outils Android
+        run: |
+          touch "$RUNNER_TEMP/build.log"
+          echo "ANDROID_HOME=$ANDROID_HOME" | tee -a "$RUNNER_TEMP/build.log"
+          ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" 2>&1 | tr '\n' ' ' | tee -a "$RUNNER_TEMP/build.log"; echo
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" 2>&1 | tail -2 | tee -a "$RUNNER_TEMP/build.log" || true
 
       - name: Préparer le projet
         working-directory: android-app
@@ -145,6 +151,8 @@ jobs:
       - name: Enregistrer le rapport (branche journal-android)
         if: always()
         run: |
+          set +e
+          touch "$RUNNER_TEMP/build.log"
           mkdir -p "$RUNNER_TEMP/j"
           { echo "Exécution $GITHUB_RUN_ID — $(date -u) — résultat : ${{ job.status }}";
             grep -E "error:|ERROR|FAILURE|What went wrong|Could not|warning: \[|Empreinte|App Firebase|google-services|Clé|clients OAuth|BUILD|nous-deux.apk|Signer|ÉCHEC|Création" "$RUNNER_TEMP/build.log" | head -150;

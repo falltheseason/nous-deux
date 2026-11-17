@@ -1,0 +1,156 @@
+name: Construire l'app Android
+
+# Fabrique nous-deux.apk et le publie dans « Releases ».
+# L'app charge le site (GitHub Pages) : les changements à l'app web arrivent
+# tout seuls ; ce fichier ne sert que quand la partie Android change.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android-app/**"
+      - ".github/workflows/build-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PROJECT_ID: nous-2-48a67
+  PACKAGE: ca.nousdeux.app
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Préparer le projet
+        working-directory: android-app
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee -a "$RUNNER_TEMP/build.log"
+          npx cap sync android 2>&1 | tee -a "$RUNNER_TEMP/build.log"
+
+      # Clé de signature : créée une seule fois, gardée chiffrée dans la branche
+      # android-signing. Le mot de passe est dérivé d'un secret GitHub existant,
+      # donc la clé est inutilisable pour qui n'a pas ce secret.
+      - name: Clé de signature
+        if: env.HAS_KEY == 'true'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -e
+          PASS=$(printf '%s' "$SA" | sha256sum | cut -c1-40)
+          echo "::add-mask::$PASS"
+          KS="$RUNNER_TEMP/nd.jks"
+          if git ls-remote --exit-code --heads origin android-signing >/dev/null 2>&1; then
+            git fetch -q origin android-signing
+            git show origin/android-signing:keystore.enc > "$RUNNER_TEMP/ks.enc"
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass "pass:$PASS" -in "$RUNNER_TEMP/ks.enc" -out "$KS"
+            echo "Clé existante réutilisée" | tee -a "$RUNNER_TEMP/build.log"
+          else
+            keytool -genkeypair -keystore "$KS" -alias nousdeux -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$PASS" -keypass "$PASS" -dname "CN=Nous deux, O=Nous deux, C=CA"
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -pass "pass:$PASS" -in "$KS" -out "$RUNNER_TEMP/ks.enc"
+            mkdir -p "$RUNNER_TEMP/sig" && cp "$RUNNER_TEMP/ks.enc" "$RUNNER_TEMP/sig/keystore.enc"
+            cd "$RUNNER_TEMP/sig"
+            printf 'Clé de signature de l’app Android, chiffrée (AES-256).\n' > LISEZMOI.txt
+            git init -q && git checkout -q -b android-signing
+            git config user.name "github-actions" && git config user.email "github-actions@users.noreply.github.com"
+            git add . && git commit -q -m "Clé de signature chiffrée"
+            git push -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" android-signing
+            echo "Nouvelle clé créée et sauvegardée (chiffrée)" | tee -a "$RUNNER_TEMP/build.log"
+          fi
+          SHA1=$(keytool -list -v -keystore "$KS" -alias nousdeux -storepass "$PASS" | sed -n 's/.*SHA1: *//p' | tr -d ' ')
+          SHA256=$(keytool -list -v -keystore "$KS" -alias nousdeux -storepass "$PASS" | sed -n 's/.*SHA256: *//p' | tr -d ' ')
+          echo "SHA1=$SHA1" >> "$GITHUB_ENV"
+          echo "SHA256=$SHA256" >> "$GITHUB_ENV"
+          echo "ND_KEYSTORE=$KS" >> "$GITHUB_ENV"
+          echo "ND_KEYSTORE_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          echo "Empreinte SHA-1 : $SHA1" | tee -a "$RUNNER_TEMP/build.log"
+
+      - name: Connexion à Google Cloud
+        if: env.HAS_KEY == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        if: env.HAS_KEY == 'true'
+
+      # Inscrit l'app Android dans Firebase (une fois), ajoute l'empreinte de la clé
+      # (nécessaire pour la connexion Google) et récupère google-services.json.
+      - name: Firebase pour Android
+        if: env.HAS_KEY == 'true'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          {
+            gcloud services enable firebase.googleapis.com --project "$PROJECT_ID" || true
+            FB="npx -y firebase-tools@15"
+            APP_ID=$($FB apps:list ANDROID --project "$PROJECT_ID" --json | jq -r --arg p "$PACKAGE" '.result[]? | select(.packageName==$p) | .appId' | head -1)
+            if [ -z "$APP_ID" ]; then
+              echo "Création de l'app Android dans Firebase…"
+              APP_ID=$($FB apps:create ANDROID "Nous deux (Android)" --package-name "$PACKAGE" --project "$PROJECT_ID" --json | jq -r '.result.appId')
+            fi
+            echo "App Firebase : $APP_ID"
+            SHAS=$($FB apps:android:sha:list "$APP_ID" --project "$PROJECT_ID" 2>&1 | tr -d ':' | tr 'A-Z' 'a-z')
+            for S in "$SHA1" "$SHA256"; do
+              s=$(echo "$S" | tr -d ':' | tr 'A-Z' 'a-z')
+              if echo "$SHAS" | grep -q "$s"; then echo "Empreinte déjà enregistrée"; else
+                $FB apps:android:sha:create "$APP_ID" "$S" --project "$PROJECT_ID" && echo "Empreinte ajoutée"; sleep 5; fi
+            done
+            sleep 10
+            $FB apps:sdkconfig ANDROID "$APP_ID" --project "$PROJECT_ID" --out android-app/android/app/google-services.json
+            echo "google-services.json : clients OAuth (types) = $(jq -c '[.client[0].oauth_client[]?.client_type]' android-app/android/app/google-services.json)"
+          } 2>&1 | tee -a "$RUNNER_TEMP/build.log"
+
+      - name: Construire l'APK
+        working-directory: android-app/android
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          export ND_VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))
+          export ND_VERSION_NAME="1.${GITHUB_RUN_NUMBER}"
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee -a "$RUNNER_TEMP/build.log" | grep -v "^Download\|^> Task" || true
+          test -f app/build/outputs/apk/release/app-release.apk || { echo "ÉCHEC : pas d'APK" | tee -a "$RUNNER_TEMP/build.log"; exit 1; }
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/nous-deux.apk"
+          ls -la "$RUNNER_TEMP/nous-deux.apk" | tee -a "$RUNNER_TEMP/build.log"
+          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$RUNNER_TEMP/nous-deux.apk" 2>&1 | head -3 | tee -a "$RUNNER_TEMP/build.log" || true
+
+      - name: Publier
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete app-android --yes --cleanup-tag 2>/dev/null || true
+          gh release create app-android "$RUNNER_TEMP/nous-deux.apk" \
+            --title "Nous deux pour Android (version 1.${GITHUB_RUN_NUMBER})" \
+            --notes "Touche « nous-deux.apk » ci-dessous pour télécharger, puis ouvre le fichier pour installer." \
+            --latest 2>&1 | tee -a "$RUNNER_TEMP/build.log"
+
+      - name: Enregistrer le rapport (branche journal-android)
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/j"
+          { echo "Exécution $GITHUB_RUN_ID — $(date -u) — résultat : ${{ job.status }}";
+            grep -E "error:|ERROR|FAILURE|What went wrong|Could not|warning: \[|Empreinte|App Firebase|google-services|Clé|clients OAuth|BUILD|nous-deux.apk|Signer|ÉCHEC|Création" "$RUNNER_TEMP/build.log" | head -150;
+            echo "----- fin du journal -----"; tail -n 120 "$RUNNER_TEMP/build.log"; } > "$RUNNER_TEMP/j/rapport.txt"
+          cd "$RUNNER_TEMP/j"
+          git init -q && git checkout -q -b journal-android
+          git config user.name "github-actions" && git config user.email "github-actions@users.noreply.github.com"
+          git add rapport.txt && git commit -q -m "Rapport $GITHUB_RUN_ID"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" journal-android

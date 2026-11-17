@@ -1,0 +1,20 @@
+{
+  "appId": "ca.nousdeux.app",
+  "appName": "Nous deux",
+  "webDir": "www",
+  "server": {
+    "url": "https://falltheseason.github.io/nous-deux/",
+    "errorPath": "index.html",
+    "androidScheme": "https"
+  },
+  "android": {
+    "appendUserAgent": "NousDeuxApp/1",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}

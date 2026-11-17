@@ -22,34 +22,40 @@ const BAD_TOKEN = new Set([
   "messaging/invalid-argument",
 ]);
 
-// Envoie à tous les appareils d'une personne, retire les jetons périmés
-async function sendTo(userDoc, data) {
-  const tokens = (userDoc.get("fcm") || []).filter(Boolean);
-  if (!tokens.length) return { total: 0, sent: 0, errors: [] };
-  const res = await messaging.sendEachForMulticast({
-    tokens,
-    data,
-    webpush: { headers: { Urgency: "high", TTL: "86400" } },
-  });
-  const bad = [], errors = [];
-  res.responses.forEach((r, i) => {
-    if (r.success) return;
-    const code = (r.error && r.error.code) || "inconnu";
-    errors.push(code);
-    if (BAD_TOKEN.has(code)) bad.push(tokens[i]);
-  });
-  if (bad.length) await userDoc.ref.update({ fcm: FieldValue.arrayRemove(...bad) });
-  return { total: tokens.length, sent: res.successCount, errors };
+// Envoie à tous les appareils d'une personne, retire les jetons périmés.
+// fcm = navigateurs (app web), fcmNative = app Android.
+// opts.nativeOnly : messages que seule l'app Android comprend (ex. arrêter la sonnerie).
+async function sendTo(userDoc, data, opts = {}) {
+  const out = { total: 0, sent: 0, errors: [] };
+  const groups = [["fcmNative", { android: { priority: "high", ttl: data.kind === "ring" ? 30000 : 86400000 } }]];
+  if (!opts.nativeOnly) groups.push(["fcm", { webpush: { headers: { Urgency: "high", TTL: "86400" } } }]);
+  for (const [field, extra] of groups) {
+    const tokens = [...new Set((userDoc.get(field) || []).filter(Boolean))];
+    if (!tokens.length) continue;
+    const res = await messaging.sendEachForMulticast({ tokens, data, ...extra });
+    const bad = [];
+    res.responses.forEach((r, i) => {
+      if (r.success) return;
+      const code = (r.error && r.error.code) || "inconnu";
+      out.errors.push(code);
+      if (BAD_TOKEN.has(code)) bad.push(tokens[i]);
+    });
+    if (bad.length) await userDoc.ref.update({ [field]: FieldValue.arrayRemove(...bad) });
+    out.total += tokens.length;
+    out.sent += res.successCount;
+  }
+  return out;
 }
 
 // Prévient l'autre personne
-async function notifyOthers(by, makeBody, tag, extra) {
+async function notifyOthers(by, makeBody, tag, extra, opts) {
   const users = await db.collection("users").get();
   const sender = users.docs.find((d) => d.id === by);
   const name = (sender && sender.get("name")) || "Ton amour";
+  const who = String(name).split(" ")[0];
   for (const u of users.docs) {
     if (u.id === by) continue;
-    await sendTo(u, { title: "Nous deux", body: makeBody(name), tag, ...(extra || {}) });
+    await sendTo(u, { title: "Nous deux", body: makeBody(name), tag, who, ...(extra || {}) }, opts);
   }
 }
 
@@ -57,6 +63,24 @@ exports.notifierMessage = onDocumentCreated("messages/{id}", async (event) => {
   const msg = event.data && event.data.data();
   if (!msg || !msg.by || msg.kind === "call") return; // le résumé d'appel ne déclenche pas « t'a écrit »
   await notifyOthers(msg.by, (n) => `${n} t'a écrit 💌`, "message");
+});
+
+// Ajout à une liste : une seule alerte par rafale (si on ajoute 10 choses d'affilée,
+// l'autre reçoit une notification, pas 10). Le contenu est chiffré : on ne dit pas quoi.
+const LIST_QUIET_MS = 3 * 60 * 1000;
+exports.notifierElement = onDocumentCreated("items/{id}", async (event) => {
+  const it = event.data && event.data.data();
+  if (!it || !it.by) return;
+  const ref = db.collection("notifState").doc("lists-" + it.by);
+  const send = await db.runTransaction(async (tx) => {
+    const s = await tx.get(ref);
+    const last = s.exists ? s.get("at") || 0 : 0;
+    if (Date.now() - last < LIST_QUIET_MS) return false;
+    tx.set(ref, { at: Date.now() });
+    return true;
+  });
+  if (!send) return;
+  await notifyOthers(it.by, (n) => `📝 ${n} a ajouté quelque chose à une liste`, "lists");
 });
 
 exports.notifierEvenement = onDocumentCreated("events/{id}", async (event) => {
@@ -76,7 +100,7 @@ exports.notifierAppel = onDocumentCreated({ document: "calls/{id}", timeoutSecon
   for (let i = 0; i < 9; i++) {
     const snap = i === 0 ? event.data : await ref.get();
     if (!snap.exists || snap.get("status") !== "ringing") break;
-    await notifyOthers(c.by, (n) => `📞 ${n} t'appelle${kind}… Touche pour répondre`, "call", { kind: "ring" });
+    await notifyOthers(c.by, (n) => `📞 ${n} t'appelle${kind}… Touche pour répondre`, "call", { kind: "ring", video: c.video ? "1" : "0" });
     await sleep(5000);
   }
   // attendre que l'appel se termine (l'appelant abandonne après 45 s)
@@ -89,6 +113,9 @@ exports.notifierAppel = onDocumentCreated({ document: "calls/{id}", timeoutSecon
   }
   if (["ringing", "missed", "cancelled", "failed"].includes(st)) {
     await notifyOthers(c.by, (n) => `📵 Appel${c.video ? " vidéo" : ""} manqué de ${n}`, "call", { kind: "missed" });
+  } else {
+    // répondu (ou refusé) : arrêter la sonnerie de l'app Android sur les autres appareils
+    await notifyOthers(c.by, () => "", "call", { kind: "callend" }, { nativeOnly: true });
   }
 });
 

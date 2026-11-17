@@ -1,2 +1,5 @@
 functions/node_modules/
 functions/.env
+android-app/node_modules
+android-app/android/app/google-services.json
+*.jks

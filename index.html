@@ -604,6 +604,12 @@ const CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "COLLE_ICI
 // Clé publique « Web Push » (Firebase → Paramètres → Cloud Messaging → Certificats Web Push)
 const VAPID_KEY = "BN5rwv1dRVHcRpGspHgSLwd3lmnquJIe6SEiWHC67-qE9vxRUxAgrW6DfIrYAud5_6QeSonZwewacWYmWqCHDmw";
 const FN_REGION = "northamerica-northeast1"; // région des fonctions Firebase
+// Dans l'app Android (coquille Capacitor), la page parle à Android par ce pont
+const NATIVE = /NousDeuxApp\//.test(navigator.userAgent);
+const APK_URL = "https://github.com/falltheseason/nous-deux/releases/latest/download/nous-deux.apk";
+const nat = (method, opts = {}, plugin = "NousDeux") => window.Capacitor?.nativePromise
+  ? window.Capacitor.nativePromise(plugin, method, opts)
+  : Promise.reject(new Error("Pont Android absent"));
 const AUTO_LOCK_MS = 3 * 60e3;   // verrouillage après 3 min en arrière-plan
 const MAX_PIN_FAILS = 5;
 
@@ -842,6 +848,14 @@ async function firebaseBackend() {
     },
     watchDoc: (col, id, cb) => F.onSnapshot(F.doc(db, col, id), (s) => cb(s.exists() ? conv(s) : null), (e) => console.warn(e)),
     async signIn() {
+      if (NATIVE) {
+        // Google interdit la connexion dans une vue web : on passe par Android
+        const r = await nat("signInWithGoogle", { skipNativeAuth: true }, "FirebaseAuthentication");
+        const tok = r?.credential?.idToken;
+        if (!tok) throw Object.assign(new Error("Connexion annulée"), { code: "auth/popup-closed-by-user" });
+        await A.signInWithCredential(auth, A.GoogleAuthProvider.credential(tok));
+        return;
+      }
       const p = new A.GoogleAuthProvider();
       p.setCustomParameters({ prompt: "select_account" });
       try { await A.signInWithPopup(auth, p); }
@@ -851,7 +865,7 @@ async function firebaseBackend() {
         else throw e;
       }
     },
-    signOut: () => A.signOut(auth),
+    signOut: () => { if (NATIVE) nat("signOut", {}, "FirebaseAuthentication").catch(() => {}); return A.signOut(auth); },
     onUser: (cb) => A.onAuthStateChanged(auth, cb),
     watch(col, opt, cb, err) {
       const cs = [];
@@ -1165,7 +1179,7 @@ function choosePin(then) {
    Le capteur du téléphone produit un secret, disponible seulement après
    ton empreinte. Ce secret chiffre la clé sur l'appareil : sans ton doigt
    (ou ton NIP), la clé reste illisible. */
-const bioSupported = () => !!(window.PublicKeyCredential && navigator.credentials?.create);
+const bioSupported = () => !NATIVE && !!(window.PublicKeyCredential && navigator.credentials?.create);
 const bioRecord = () => { const b = lsGet("bio"); return b && S.meta && b.tag === vaultTag(S.meta) ? b : null; };
 async function bioWrapKey(prf) {
   const base = await crypto.subtle.importKey("raw", prf, "HKDF", false, ["deriveKey"]);
@@ -1401,6 +1415,7 @@ function startApp() {
   renderNotifBanner();
   refreshNotifToken();
   clearNotifs();
+  if (NATIVE) nativeAfterUnlock();
   setTimeout(() => iceServers(), 3000);
 }
 
@@ -1408,7 +1423,7 @@ $("#btn-login").onclick = async () => {
   $("#login-err").classList.add("hidden");
   try { await be.signIn(); }
   catch (e) {
-    if (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request") return;
+    if (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request" || /cancel|annul/i.test(e.message || "")) return;
     const p = $("#login-err");
     p.textContent = e.code === "auth/unauthorized-domain"
       ? "Ce site n'est pas autorisé dans Firebase (Authentication → Paramètres → Domaines autorisés)."
@@ -1420,7 +1435,9 @@ async function signOut() {
   if (S.me) {
     const t = lsGet("fcm");
     if (t) { await be.set("users", S.me.uid, { fcm: be.arrayRemove(t) }, true).catch(() => {}); be.deleteMessagingToken?.().catch(() => {}); }
-    ["key", "fails", "fcm", "bio"].forEach(lsDel);
+    const tn = lsGet("fcmN");
+    if (tn) await be.set("users", S.me.uid, { fcmNative: be.arrayRemove(tn) }, true).catch(() => {});
+    ["key", "fails", "fcm", "fcmN", "bio"].forEach(lsDel);
   }
   lockState();
   be?.signOut();
@@ -1934,7 +1951,8 @@ function openSettings() {
     bioSupported() ? menuRow("👆", bioRecord() ? "Désactiver l'empreinte" : "Déverrouiller avec l'empreinte",
       bioRecord() ? "Activée sur cet appareil" : "Au lieu du NIP, sur cet appareil",
       () => { if (bioRecord()) { lsDel("bio"); closeSheet(); toast("Empreinte désactivée"); } else { closeSheetNow(); bioSetup(); } }) : null,
-    menuRow("🔊", "Sons et alertes", "Pour ne plus manquer un appel ou un message", () => { closeSheetNow(); soundGuide(); }),
+    menuRow(NATIVE ? "📞" : "🔊", NATIVE ? "Sonnerie des appels" : "Sons et alertes", NATIVE ? "Plein écran, batterie, choix de la sonnerie" : "Pour ne plus manquer un appel ou un message", () => { closeSheetNow(); soundGuide(); }),
+    !NATIVE && /Android/i.test(navigator.userAgent) ? menuRow("📲", "Installer l'app Android", "Les appels sonnent comme un vrai appel", () => { location.href = APK_URL; }) : null,
     menuRow("🧪", "Tester les notifications", "Envoie une notification de test sur tes appareils", () => { closeSheet(); testNotifs(); }),
     menuRow("🔒", "Verrouiller maintenant", "Il faudra entrer ton NIP", () => { closeSheetNow(); lock(); }),
     menuRow("👋", "Se déconnecter", S.me.email ? S.me.email + " · la phrase secrète sera oubliée sur cet appareil" : "",
@@ -1944,19 +1962,20 @@ function openSettings() {
 /* ============================================================
    Notifications
    ============================================================ */
-const notifSupported = () => "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
-const notifOn = () => notifSupported() && Notification.permission === "granted" && !!lsGet("fcm");
+const notifSupported = () => NATIVE || ("Notification" in window && "serviceWorker" in navigator && "PushManager" in window);
+const notifOn = () => NATIVE ? !!lsGet("fcmN") : notifSupported() && Notification.permission === "granted" && !!lsGet("fcm");
 function renderNotifBanner() {
   let dismissed = false; try { dismissed = !!lsGet("notif-x"); } catch {}
-  const show = !!VAPID_KEY && !DEMO && notifSupported() && !notifOn() && Notification.permission !== "denied" && !dismissed;
+  const show = !DEMO && !dismissed && !notifOn() && (NATIVE || (!!VAPID_KEY && notifSupported() && Notification.permission !== "denied"));
   $("#notif-banner").classList.toggle("hidden", !show);
   $("#notif-text").textContent = `🔔 Être averti quand ${partnerName()} t'écrit?`;
 }
 $("#btn-notif-on").onclick = () => enableNotifs();
 $("#btn-notif-x").onclick = () => { lsSet("notif-x", 1); renderNotifBanner(); };
 
-async function enableNotifs() {
+async function enableNotifs(quiet) {
   if (DEMO) { toast("Pas disponible en démo"); return; }
+  if (NATIVE) return enableNativeNotifs(quiet);
   if (!VAPID_KEY) { toast("Les notifications ne sont pas encore configurées."); return; }
   if (!notifSupported()) { toast("Installe l'app sur l'écran d'accueil pour recevoir des notifications.", 4000); return; }
   const perm = await Notification.requestPermission();
@@ -1976,6 +1995,11 @@ async function enableNotifs() {
   renderNotifBanner();
 }
 async function disableNotifs() {
+  if (NATIVE) {
+    const tn = lsGet("fcmN"); lsDel("fcmN");
+    if (tn) await be.set("users", S.me.uid, { fcmNative: be.arrayRemove(tn) }, true).catch(() => {});
+    lsSet("notif-x", 1); toast("Notifications désactivées"); renderNotifBanner(); return;
+  }
   const t = lsGet("fcm");
   lsDel("fcm");
   if (t) await be.set("users", S.me.uid, { fcm: be.arrayRemove(t) }, true).catch(() => {});
@@ -1986,6 +2010,7 @@ async function disableNotifs() {
 }
 async function refreshNotifToken() {
   // garde le jeton à jour (il peut changer avec le temps)
+  if (NATIVE) { if (notifOn() && !DEMO) enableNativeNotifs(true); return; }
   if (!notifOn() || !VAPID_KEY || DEMO) return;
   try {
     const reg = await navigator.serviceWorker.ready;
@@ -1998,9 +2023,76 @@ async function refreshNotifToken() {
 }
 
 function clearNotifs() {
+  if (NATIVE) { nat("clearNotifications").catch(() => {}); return; }
   navigator.serviceWorker?.ready.then((reg) => reg.getNotifications()).then((ns) => ns?.forEach((n) => n.close())).catch(() => {});
 }
+/* ---------- App Android ---------- */
+async function enableNativeNotifs(quiet) {
+  try {
+    const st = await nat("requestNotifications");
+    if (!st.notifications) {
+      if (!quiet) { toast("Les notifications sont bloquées pour Nous deux. Active-les dans les réglages Android.", 5000); nat("openSettings", { which: "notifications" }).catch(() => {}); }
+      return;
+    }
+    const { token } = await nat("getToken");
+    const old = lsGet("fcmN");
+    if (token && token !== old) {
+      await be.set("users", S.me.uid, { fcmNative: be.arrayUnion(token) }, true);
+      if (old) await be.set("users", S.me.uid, { fcmNative: be.arrayRemove(old) }, true).catch(() => {});
+      lsSet("fcmN", token);
+    }
+    if (!quiet) toast("Notifications activées 🔔");
+    renderNotifBanner();
+  } catch (e) {
+    console.error(e);
+    if (!quiet) toast("Impossible d'activer les notifications : " + (e.message || e), 6000);
+  }
+}
+async function nativeAfterUnlock() {
+  if (!lsGet("fcmN") && !lsGet("notif-x")) await enableNativeNotifs(true);
+  checkLaunchAction();
+  // une seule fois : vérifier que la sonnerie pourra vraiment s'afficher en plein écran
+  try {
+    const st = await nat("getStatus");
+    if (lsGet("fcmN") && !lsGet("ring-setup") && (!st.fullScreen || !st.batteryUnrestricted)) { lsSet("ring-setup", 1); ringSetup(); }
+  } catch {}
+}
+// « Répondre » touché sur l'écran d'appel d'Android
+let autoAnswerAt = 0;
+async function checkLaunchAction() {
+  if (!NATIVE || !KEY) return;
+  try {
+    const { action } = await nat("takeLaunchAction");
+    if (action !== "answer") return;
+    if (Call.status === "incoming") acceptCall();
+    else autoAnswerAt = Date.now();
+  } catch {}
+}
+if (NATIVE) {
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkLaunchAction(); });
+  try { window.Capacitor?.addListener?.("NousDeux", "launchAction", () => checkLaunchAction()); } catch {}
+}
+async function ringSetup() {
+  let st = {};
+  try { st = await nat("getStatus"); } catch {}
+  const row = (ok, title, sub, which, btn) => h("div", { class: "gstep" },
+    h("span", { class: "gnum", text: ok ? "✓" : "!" , style: ok ? "background:var(--ok);color:#fff" : "" }),
+    h("div", { class: "grow" }, h("b", { text: title }), h("div", { class: "psub", text: sub }),
+      ok ? null : h("button", { class: "btn small", style: "margin-top:8px", text: btn, onclick: () => { closeSheetNow(); nat("openSettings", { which }).catch(onErr); } })));
+  openSheet("Sonnerie des appels", h("div", { style: "display:flex;flex-direction:column;gap:14px" },
+    h("p", { class: "psub", style: "font-size:14px", text: "Pour que ça sonne comme un vrai appel, même quand le téléphone est verrouillé ou que l'app est fermée :" }),
+    row(st.notifications, "Notifications permises", st.notifications ? "C'est bon." : "Sans ça, aucune alerte ne peut arriver.", "notifications", "Ouvrir les réglages"),
+    row(st.fullScreen, "Appels en plein écran", st.fullScreen ? "C'est bon." : "Permet à l'écran d'appel de s'allumer par-dessus tout. Active « Autoriser ».", "fullScreen", "Autoriser"),
+    row(st.batteryUnrestricted, "Batterie sans restriction", st.batteryUnrestricted ? "C'est bon." : "Sinon Android peut endormir l'app et retarder les appels. Réponds « Autoriser ».", "battery", "Autoriser"),
+    h("div", { class: "rowbtns", style: "flex-wrap:wrap;justify-content:flex-start" },
+      h("button", { class: "btn ghost small", text: "🔔 Choisir la sonnerie", onclick: () => nat("openSettings", { which: "calls" }).catch(onErr) }),
+      h("button", { class: "btn ghost small", text: "📞 Faire sonner pour tester", onclick: () => { closeSheet(); nat("testRing", { who: "Test" }).then(() => toast("Ça sonne? Touche « Ignorer » pour arrêter.", 5000)).catch(onErr); } })),
+    h("p", { class: "psub", text: "Si tu utilises « Ne pas déranger », ajoute Nous deux aux exceptions dans les réglages Android." })),
+    [h("button", { class: "btn", text: "Terminé", onclick: closeSheet })]);
+}
+
 function soundGuide() {
+  if (NATIVE) return ringSetup();
   const step = (n, t, d) => h("div", { class: "gstep" }, h("span", { class: "gnum", text: n }), h("div", {}, h("b", { text: t }), d ? h("div", { class: "psub", text: d }) : null));
   openSheet("Sons et alertes", h("div", { style: "display:flex;flex-direction:column;gap:14px" },
     h("p", { class: "psub", style: "font-size:14px", text: "Android range les alertes des apps web comme des notifications ordinaires. Ces réglages les rendent aussi visibles et sonores qu'un vrai appel." }),
@@ -2032,7 +2124,7 @@ async function testNotifs() {
     if (p?.done) {
       be.remove("pings", id).catch(() => {});
       if (!p.total) toast("Le serveur ne trouve aucun appareil enregistré. Désactive puis réactive les notifications.", 7000);
-      else if (p.sent) toast(`✅ Envoyé à ${p.sent} appareil${p.sent > 1 ? "s" : ""}. Si rien n'apparaît, vérifie que Chrome a le droit d'afficher des notifications dans les réglages Android.`, 9000);
+      else if (p.sent) toast(`✅ Envoyé à ${p.sent} appareil${p.sent > 1 ? "s" : ""}. Si rien n'apparaît, vérifie que ${NATIVE ? "Nous deux" : "Chrome"} a le droit d'afficher des notifications dans les réglages Android.`, 9000);
       else toast("Le serveur a essayé mais l'envoi a échoué : " + (p.errors || []).join(", "), 9000);
       return;
     }
@@ -2791,11 +2883,35 @@ async function asRunTool(name, x) {
 }
 
 /* Dictée vocale (reconnaissance vocale de Chrome) */
-const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (!SpeechRec) $("#as-mic").classList.add("hidden");
-function asStopDictation() { try { AS.rec?.stop(); } catch {} }
+const SpeechRec = NATIVE ? null : (window.SpeechRecognition || window.webkitSpeechRecognition);
+if (!SpeechRec && !NATIVE) $("#as-mic").classList.add("hidden");
+function asStopDictation() {
+  if (AS.rec?.native) { nat("stop", {}, "SpeechRecognition").catch(() => {}); return; }
+  try { AS.rec?.stop(); } catch {}
+}
+async function nativeDictation() {
+  const P = "SpeechRecognition";
+  try {
+    let perm = await nat("checkPermissions", {}, P);
+    if (perm.speechRecognition !== "granted") perm = await nat("requestPermissions", {}, P);
+    if (perm.speechRecognition !== "granted") { toast("Permets l'accès au micro pour dicter."); return; }
+    AS.rec = { native: true };
+    $("#as-mic").classList.add("live");
+    const base = asInput.value.trim() ? asInput.value.trim() + " " : "";
+    const r = await nat("start", { language: "fr-CA", maxResults: 1, partialResults: false, popup: false }, P);
+    const t = (r?.matches?.[0] || "").trim();
+    if (t) { asInput.value = base + t; asInput.dispatchEvent(new Event("input")); }
+  } catch (e) {
+    const m = e?.message || String(e);
+    if (!/match|cancel|annul|speech timeout|No speech/i.test(m)) toast("Dictée impossible : " + m, 5000);
+  } finally {
+    AS.rec = null;
+    $("#as-mic").classList.remove("live");
+  }
+}
 $("#as-mic").onclick = () => {
   if (AS.rec) { asStopDictation(); return; }
+  if (NATIVE) { nativeDictation(); return; }
   // Une phrase à la fois : sur Android, le mode « continu » répète le texte en boucle.
   // Touche le micro de nouveau pour ajouter une autre phrase.
   const rec = new SpeechRec();
@@ -3302,6 +3418,8 @@ function incomingCall(d) {
   showCallUI();
   setCallStatus(d.video ? "Appel vidéo entrant…" : "Appel entrant…");
   startRing("in");
+  if (NATIVE) nat("stopRinging").catch(() => {});
+  if (autoAnswerAt && Date.now() - autoAnswerAt < 90e3) { autoAnswerAt = 0; setTimeout(() => acceptCall(), 300); }
   Call.unsub = be.watchDoc("calls", d.id, onCallDoc);
   Call.timeout = setTimeout(() => { if (Call.status === "incoming") resetCall(); }, 45000);
 }
@@ -3426,7 +3544,10 @@ window.addEventListener("popstate", () => {
 });
 
 /* Installation hors ligne */
-if ("serviceWorker" in navigator && location.protocol === "https:") {
+if (NATIVE) {
+  // l'app Android gère elle-même les notifications ; pas de cache hors ligne ici
+  navigator.serviceWorker?.getRegistrations?.().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+} else if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 

@@ -1,0 +1,16 @@
+{
+  "name": "nous-deux-android",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Coquille Android de « Nous deux » : charge l'app web et ajoute la sonnerie d'appel et les notifications natives",
+  "scripts": {},
+  "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor-firebase/authentication": "^8.6.0",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2"
+  }
+}

@@ -1,0 +1,131 @@
+Exécution 44168411082 — Tue Nov 17 20:24:19 UTC 2026 — résultat : success
+Clé existante réutilisée
+Empreinte SHA-1 : 35:5A:0B:C2:5B:FB:45:22:F1:58:08:43:52:CA:9C:AE:D8:B3:3E:02
+App Firebase : 1:1009106158859:android:7f1b155f5ea45e48100e0e
+Empreinte déjà enregistrée
+Empreinte déjà enregistrée
+App configuration is written in android-app/android/app/google-services.json
+google-services.json : clients OAuth (types) = [1,3]
+BUILD SUCCESSFUL in 1m 47s
+-rw-r--r-- 1 runner runner 5472336 Nov 17 20:24 /home/runner/work/_temp/nous-deux.apk
+----- fin du journal -----
+> Task :capacitor-android:prepareLintJarForPublish
+> Task :capacitor-community-speech-recognition:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-community-speech-recognition:createFullJarRelease
+> Task :capacitor-community-speech-recognition:extractProguardFiles
+> Task :capacitor-community-speech-recognition:generateReleaseLintModel
+> Task :capacitor-community-speech-recognition:prepareLintJarForPublish
+> Task :capacitor-cordova-android-plugins:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-cordova-android-plugins:createFullJarRelease
+> Task :capacitor-cordova-android-plugins:extractProguardFiles
+> Task :app:mergeExtDexRelease
+> Task :capacitor-cordova-android-plugins:generateReleaseLintModel
+> Task :capacitor-cordova-android-plugins:prepareLintJarForPublish
+> Task :capacitor-firebase-authentication:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-firebase-authentication:createFullJarRelease
+> Task :capacitor-firebase-authentication:extractProguardFiles
+> Task :capacitor-firebase-authentication:generateReleaseLintModel
+> Task :capacitor-firebase-authentication:prepareLintJarForPublish
+> Task :app:generateReleaseLintVitalReportModel
+> Task :capacitor-community-speech-recognition:checkReleaseAarMetadata
+> Task :capacitor-community-speech-recognition:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-community-speech-recognition:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-community-speech-recognition:extractDeepLinksForAarRelease
+> Task :app:mergeDexRelease
+> Task :capacitor-community-speech-recognition:extractReleaseAnnotations
+> Task :capacitor-community-speech-recognition:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-community-speech-recognition:mergeReleaseConsumerProguardFiles
+> Task :capacitor-firebase-authentication:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-firebase-authentication:checkReleaseAarMetadata
+> Task :capacitor-firebase-authentication:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-firebase-authentication:extractDeepLinksForAarRelease
+> Task :capacitor-firebase-authentication:extractReleaseAnnotations
+> Task :capacitor-community-speech-recognition:mergeReleaseJavaResource
+> Task :capacitor-firebase-authentication:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-community-speech-recognition:syncReleaseLibJars
+> Task :capacitor-community-speech-recognition:bundleReleaseLocalLintAar
+> Task :capacitor-firebase-authentication:mergeReleaseConsumerProguardFiles
+> Task :capacitor-firebase-authentication:mergeReleaseJavaResource
+> Task :capacitor-android:checkReleaseAarMetadata
+> Task :capacitor-firebase-authentication:syncReleaseLibJars
+> Task :capacitor-firebase-authentication:bundleReleaseLocalLintAar
+> Task :capacitor-android:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-android:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-android:extractDeepLinksForAarRelease
+> Task :capacitor-android:extractReleaseAnnotations
+> Task :capacitor-android:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-android:mergeReleaseConsumerProguardFiles
+> Task :capacitor-android:mergeReleaseJavaResource
+> Task :capacitor-cordova-android-plugins:checkReleaseAarMetadata
+> Task :capacitor-android:syncReleaseLibJars
+> Task :capacitor-android:bundleReleaseLocalLintAar
+> Task :capacitor-cordova-android-plugins:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-cordova-android-plugins:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-cordova-android-plugins:extractDeepLinksForAarRelease
+> Task :app:compileReleaseArtProfile
+> Task :capacitor-cordova-android-plugins:extractReleaseAnnotations
+> Task :capacitor-cordova-android-plugins:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-cordova-android-plugins:mergeReleaseConsumerProguardFiles
+> Task :capacitor-cordova-android-plugins:mergeReleaseJavaResource
+> Task :capacitor-cordova-android-plugins:syncReleaseLibJars
+> Task :capacitor-cordova-android-plugins:bundleReleaseLocalLintAar
+> Task :capacitor-android:writeReleaseLintModelMetadata
+> Task :capacitor-community-speech-recognition:writeReleaseLintModelMetadata
+> Task :capacitor-cordova-android-plugins:writeReleaseLintModelMetadata
+> Task :capacitor-firebase-authentication:writeReleaseLintModelMetadata
+> Task :capacitor-android:generateReleaseLintVitalModel
+> Task :capacitor-community-speech-recognition:generateReleaseLintVitalModel
+> Task :capacitor-cordova-android-plugins:generateReleaseLintVitalModel
+> Task :capacitor-firebase-authentication:generateReleaseLintVitalModel
+> Task :app:processReleaseJavaRes NO-SOURCE
+> Task :app:optimizeReleaseResources
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :capacitor-android:bundleReleaseAar
+> Task :capacitor-android:mapReleaseSourceSetPaths
+> Task :app:mergeReleaseJavaResource
+> Task :capacitor-android:mergeReleaseResources
+> Task :capacitor-community-speech-recognition:bundleReleaseAar
+> Task :capacitor-community-speech-recognition:mapReleaseSourceSetPaths
+> Task :capacitor-community-speech-recognition:mergeReleaseResources
+> Task :capacitor-android:verifyReleaseResources
+> Task :capacitor-android:assembleRelease
+> Task :capacitor-community-speech-recognition:verifyReleaseResources
+> Task :capacitor-cordova-android-plugins:bundleReleaseAar
+> Task :capacitor-community-speech-recognition:assembleRelease
+> Task :capacitor-cordova-android-plugins:mapReleaseSourceSetPaths
+> Task :capacitor-cordova-android-plugins:mergeReleaseResources
+> Task :capacitor-firebase-authentication:bundleReleaseAar
+> Task :capacitor-firebase-authentication:mapReleaseSourceSetPaths
+> Task :capacitor-firebase-authentication:mergeReleaseResources
+> Task :capacitor-cordova-android-plugins:verifyReleaseResources
+> Task :capacitor-cordova-android-plugins:assembleRelease
+> Task :capacitor-firebase-authentication:verifyReleaseResources
+> Task :capacitor-firebase-authentication:assembleRelease
+> Task :capacitor-community-speech-recognition:lintVitalAnalyzeRelease
+> Task :capacitor-cordova-android-plugins:lintVitalAnalyzeRelease
+> Task :capacitor-firebase-authentication:lintVitalAnalyzeRelease
+> Task :capacitor-android:lintVitalAnalyzeRelease
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///home/runner/work/nous-deux/nous-deux/android-app/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 47s
+208 actionable tasks: 208 executed
+-rw-r--r-- 1 runner runner 5472336 Nov 17 20:24 /home/runner/work/_temp/nous-deux.apk
+Unsupported command: /usr/local/lib/android/sdk/build-tools/35.0.0/apksigner. See --help for supported commands
+https://github.com/falltheseason/nous-deux/releases/tag/app-android

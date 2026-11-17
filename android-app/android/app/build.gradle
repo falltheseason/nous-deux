@@ -1,5 +1,9 @@
 apply plugin: 'com.android.application'
 
+// numéro de version fourni par la construction automatique (GitHub)
+def ndVersionCode = Integer.parseInt(System.getenv("ND_VERSION_CODE") ?: "1")
+def ndVersionName = System.getenv("ND_VERSION_NAME") ?: "1.0"
+
 android {
     namespace = "ca.nousdeux.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,9 +11,8 @@ android {
         applicationId "ca.nousdeux.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // numéro de version fourni par la construction automatique (GitHub)
-        versionCode (System.getenv("ND_VERSION_CODE") ?: "1").toInteger()
-        versionName System.getenv("ND_VERSION_NAME") ?: "1.0"
+        versionCode ndVersionCode
+        versionName ndVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
